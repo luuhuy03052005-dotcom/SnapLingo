@@ -46,7 +46,8 @@
     },
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "resources/icon.png"
     ],
     "publish": {
       "provider": "github",

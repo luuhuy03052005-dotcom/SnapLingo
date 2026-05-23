@@ -1,3 +1,5 @@
+import logoImg from './Logo.png';
+
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -17,7 +19,7 @@ export default function Sidebar({ activeTab, onTabChange, version, isCompact, pr
       {!isCompact && (
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-white text-xs font-bold">文</div>
+            <img src={logoImg} alt="SnapLingo Logo" className="w-7 h-7 object-contain rounded-md" />
             <div>
               <div className="text-sm font-semibold text-on-surface">SnapLingo</div>
               <div className="text-[10px] text-on-surface-variant">v{version}</div>

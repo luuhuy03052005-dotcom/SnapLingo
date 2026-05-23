@@ -6,6 +6,11 @@ let mainWindow: BrowserWindow | null = null;
 let popupWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let currentMode: 'compact' | 'expanded' = 'expanded';
+let isQuitting = false;
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
 
 /**
  * Window Management Service.
@@ -51,6 +56,13 @@ export const WindowService = {
     } else {
       mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
+
+    mainWindow.on('close', (event) => {
+      if (!isQuitting) {
+        event.preventDefault();
+        mainWindow?.hide();
+      }
+    });
 
     mainWindow.on('closed', () => {
       mainWindow = null;

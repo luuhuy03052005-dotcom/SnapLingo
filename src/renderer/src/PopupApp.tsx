@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TranslationResult } from '../../shared/types';
+import logoImg from './Logo.png';
 
 /**
  * Floating Translation Popup — Fluent Design.
@@ -97,7 +98,7 @@ export default function PopupApp() {
       {/* Title Bar */}
       <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-gray-100">
         <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+          <img src={logoImg} alt="Logo" className="w-3.5 h-3.5 object-contain" />
           <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">SnapLingo</span>
           {detectedLang && !isLoading && (
             <span className="text-[10px] text-blue-500 font-semibold ml-1">{detectedLang} → {targetLang}</span>

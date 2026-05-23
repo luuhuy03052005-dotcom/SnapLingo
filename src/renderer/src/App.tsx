@@ -354,6 +354,13 @@ export default function App() {
           <select className="fluent-input px-2 py-1 text-sm"><option>Tesseract OCR (Local)</option></select>
         </div>
         <div className="flex items-center justify-between text-sm">
+          <span className="text-on-surface-variant">OCR Language</span>
+          <select className="fluent-input px-2 py-1 text-sm" value={settings[SETTINGS_KEYS.OCR_LANGUAGE] || 'eng'} onChange={e => updateSetting(SETTINGS_KEYS.OCR_LANGUAGE, e.target.value)}>
+            <option value="eng">English</option>
+            <option value="vie">Vietnamese</option>
+          </select>
+        </div>
+        <div className="flex items-center justify-between text-sm">
           <span className="text-on-surface-variant">Database</span>
           <span className={`font-medium ${dbStatus.connected ? 'text-teal' : 'text-error'}`}>{dbStatus.connected ? 'Connected' : 'Offline'}</span>
         </div>
