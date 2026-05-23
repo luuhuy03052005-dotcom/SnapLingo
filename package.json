@@ -1,0 +1,77 @@
+{
+  "name": "snaplingo",
+  "version": "1.0.0",
+  "description": "SnapLingo Desktop Translator",
+  "main": "./out/main/main.js",
+  "author": "Antigravity",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "package": "electron-builder",
+    "drizzle:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "drizzle-orm": "^0.30.1",
+    "electron-log": "^5.1.1",
+    "electron-updater": "^6.1.8",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.61",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.18",
+    "drizzle-kit": "^0.20.14",
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.1.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4"
+  },
+  "build": {
+    "appId": "com.antigravity.snaplingo",
+    "productName": "SnapLingo",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "antigravity",
+      "repo": "snaplingo"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "extraResources": [
+      {
+        "from": "resources/ocr",
+        "to": "ocr",
+        "filter": [
+          "*.traineddata",
+          "*.traineddata.gz"
+        ]
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
+    }
+  }
+}
