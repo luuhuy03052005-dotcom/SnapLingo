@@ -145,7 +145,7 @@ export default function App() {
   );
 
   // ─── TRANSLATOR TAB ───
-  const TranslatorPanel = () => (
+  const renderTranslatorPanel = () => (
     <div className="flex flex-col h-full">
       <div className="flex-1 grid grid-cols-2 gap-4">
         <div className="flex flex-col">
@@ -191,7 +191,7 @@ export default function App() {
   );
 
   // ─── IMAGE OCR TAB ───
-  const ImagePanel = () => (
+  const renderImagePanel = () => (
     <div className="flex flex-col h-full gap-4">
       <div className={`fluent-card border-2 border-dashed p-8 text-center cursor-pointer transition-all ${isDragOver ? 'border-primary-container bg-primary-50' : 'border-outline-variant'}`}
         onClick={handleBrowseImage}
@@ -228,7 +228,7 @@ export default function App() {
     await window.snaplingo.history.clear(); loadHistory();
   };
 
-  const HistoryPanel = () => (
+  const renderHistoryPanel = () => (
     <div className="flex flex-col h-full gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-on-surface">Translation History</h2>
@@ -267,7 +267,7 @@ export default function App() {
   const devMode = settings[SETTINGS_KEYS.DEVELOPER_MODE] === 'true';
   const allowFallback = settings[SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK] === 'true';
 
-  const SettingsPanel = () => (
+  const renderSettingsPanel = () => (
     <div className="flex flex-col gap-4 max-w-2xl">
       <h2 className="text-xl font-semibold text-on-surface">Settings</h2>
       {/* Language & Provider */}
@@ -393,7 +393,7 @@ export default function App() {
   );
 
   // ─── MINI HISTORY ───
-  const MiniHistory = () => (
+  const renderMiniHistory = () => (
     <div className="flex flex-col h-full">
       <button onClick={() => setActiveTab('translator')} className="text-xs text-primary font-medium mb-2 self-start hover:underline">← Back to Translate</button>
       <h3 className="text-base font-semibold text-on-surface mb-3">Recent Translations</h3>
@@ -411,7 +411,7 @@ export default function App() {
   );
 
   // ─── MINI SETTINGS ───
-  const MiniSettings = () => (
+  const renderMiniSettings = () => (
     <div className="flex flex-col h-full">
       <h3 className="text-base font-semibold text-on-surface mb-1">Quick Settings</h3>
       <p className="text-xs text-on-surface-variant mb-3">Manage core mini-window behaviors.</p>
@@ -434,7 +434,7 @@ export default function App() {
   );
 
   // ─── MINI TRANSLATOR ───
-  const MiniTranslator = () => (
+  const renderMiniTranslator = () => (
     <div className="flex flex-col h-full gap-1.5">
       <div className="flex items-center justify-between">
         <select className="fluent-input px-1.5 py-0.5 text-[11px] text-on-surface-variant rounded-full">
@@ -470,12 +470,17 @@ export default function App() {
       { id: 'history', icon: '🕐' },
       { id: 'settings', icon: '⚙️' },
     ];
-    const miniContent: Record<string, JSX.Element> = {
-      translator: <MiniTranslator />,
-      image: <ImagePanel />,
-      history: <MiniHistory />,
-      settings: <MiniSettings />,
+
+    const renderMiniContent = () => {
+      switch (activeTab) {
+        case 'translator': return renderMiniTranslator();
+        case 'image': return renderImagePanel();
+        case 'history': return renderMiniHistory();
+        case 'settings': return renderMiniSettings();
+        default: return renderMiniTranslator();
+      }
     };
+
     return (
       <div className="flex h-screen bg-surface-container-lowest text-on-surface font-sans select-none overflow-hidden">
         <div className="w-[34px] flex flex-col items-center pt-2 pb-2 gap-0.5 border-r border-outline-variant">
@@ -496,18 +501,21 @@ export default function App() {
               <button className="text-[11px] hover:text-error" title="Close">✕</button>
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto p-2.5">{miniContent[activeTab]}</main>
+          <main className="flex-1 overflow-y-auto p-2.5">{renderMiniContent()}</main>
         </div>
       </div>
     );
   }
 
   // ─── EXPANDED (FULL) MODE ───
-  const tabContent: Record<string, JSX.Element> = {
-    translator: <TranslatorPanel />,
-    image: <ImagePanel />,
-    history: <HistoryPanel />,
-    settings: <SettingsPanel />,
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'translator': return renderTranslatorPanel();
+      case 'image': return renderImagePanel();
+      case 'history': return renderHistoryPanel();
+      case 'settings': return renderSettingsPanel();
+      default: return renderTranslatorPanel();
+    }
   };
   const tabTitle: Record<string, string> = { translator: 'SnapLingo', image: 'Image OCR', history: 'Translation History', settings: 'Settings' };
 
@@ -524,7 +532,7 @@ export default function App() {
             </button>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{tabContent[activeTab]}</main>
+        <main className="flex-1 overflow-y-auto p-6">{renderTabContent()}</main>
         {activeTab === 'translator' && (
           <div className="px-6 pb-3 flex justify-center">
             <button onClick={() => window.snaplingo?.ocr.startScreenSelection()}
