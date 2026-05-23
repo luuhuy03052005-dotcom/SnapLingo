@@ -3,6 +3,20 @@ import { TranslationResult } from '../../shared/types';
 import logoImg from './Logo.png';
 
 /**
+ * Utility to strip Electron IPC error wrappers and standard "Error:" prefixes
+ * from error messages before presenting them to the user.
+ */
+function cleanIpcError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  let cleaned = msg.replace(/^Error:\s*/, '');
+  cleaned = cleaned.replace(/^Error invoking remote method\s+'.*?':\s*/, '');
+  if (cleaned.startsWith('Error: ')) {
+    cleaned = cleaned.substring(7);
+  }
+  return cleaned;
+}
+
+/**
  * Floating Translation Popup — Fluent Design.
  * Why: Displays translated snippets at cursor position with Copy, Pin, Close, and detected language info.
  */
@@ -44,7 +58,7 @@ export default function PopupApp() {
       return;
     }
     if (originalText.startsWith('__OCR_ERROR__:')) {
-      setErrorMsg(originalText.replace('__OCR_ERROR__:', ''));
+      setErrorMsg(cleanIpcError(originalText.replace('__OCR_ERROR__:', '')));
       setIsLoading(false);
       return;
     }
@@ -70,7 +84,7 @@ export default function PopupApp() {
         setDetectedLang((result.detectedLanguage || 'auto').toUpperCase());
         setProvider(result.provider || '');
       } catch (error: unknown) {
-        setErrorMsg(error instanceof Error ? error.message : String(error));
+        setErrorMsg(cleanIpcError(error));
       } finally {
         setIsLoading(false);
       }

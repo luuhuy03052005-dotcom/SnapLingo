@@ -3,6 +3,20 @@ import { AppSettings, DbStatus, UpdateStatus, HistoryRecord, TranslationResult, 
 import { SETTINGS_KEYS } from '../../shared/constants';
 import Sidebar from './Sidebar';
 
+/**
+ * Utility to strip Electron IPC error wrappers and standard "Error:" prefixes
+ * from error messages before presenting them to the user.
+ */
+function cleanIpcError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  let cleaned = msg.replace(/^Error:\s*/, '');
+  cleaned = cleaned.replace(/^Error invoking remote method\s+'.*?':\s*/, '');
+  if (cleaned.startsWith('Error: ')) {
+    cleaned = cleaned.substring(7);
+  }
+  return cleaned;
+}
+
 export default function App() {
   const [version, setVersion] = useState('...');
   const [dbStatus, setDbStatus] = useState<DbStatus>({ connected: false, path: '' });
@@ -101,7 +115,7 @@ export default function App() {
         text: sourceText, targetLanguage: settings[SETTINGS_KEYS.TARGET_LANGUAGE] || 'vi', sourceType: 'text'
       });
       setTranslatedResult(r.translatedText);
-    } catch (e: unknown) { setTranslateError(e instanceof Error ? e.message : String(e)); }
+    } catch (e: unknown) { setTranslateError(cleanIpcError(e)); }
     finally { setIsTranslating(false); }
   };
   const copyToClip = async (text: string, setter: (v: boolean) => void) => {
@@ -115,7 +129,7 @@ export default function App() {
       if (!r) { setIsImageProcessing(false); return; }
       if (!r.ocrText?.trim()) setImageError('No readable text found.');
       else { setImageResult(r); setImageFileName('Selected image'); }
-    } catch (e: unknown) { setImageError(e instanceof Error ? e.message : String(e)); }
+    } catch (e: unknown) { setImageError(cleanIpcError(e)); }
     finally { setIsImageProcessing(false); }
   };
   const handleDropImage = async (path: string, name: string) => {
@@ -125,14 +139,14 @@ export default function App() {
       const r = await window.snaplingo.ocr.recognizeImage(path);
       if (!r?.ocrText?.trim()) setImageError('No readable text found.');
       else setImageResult(r);
-    } catch (e: unknown) { setImageError(e instanceof Error ? e.message : String(e)); }
+    } catch (e: unknown) { setImageError(cleanIpcError(e)); }
     finally { setIsImageProcessing(false); }
   };
   const handleCheckUpdates = async () => {
     if (!window.snaplingo) return;
     setUpdateStatus({ status: 'checking', message: 'Checking...' });
     try { setUpdateStatus(await window.snaplingo.update.check()); }
-    catch (e: unknown) { setUpdateStatus({ status: 'error', message: e instanceof Error ? e.message : String(e) }); }
+    catch (e: unknown) { setUpdateStatus({ status: 'error', message: cleanIpcError(e) }); }
   };
 
   const privacyMode = settings[SETTINGS_KEYS.PRIVACY_MODE] === 'true';
