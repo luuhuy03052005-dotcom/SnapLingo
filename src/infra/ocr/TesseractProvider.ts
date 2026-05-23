@@ -1,5 +1,5 @@
+import { createWorker } from 'tesseract.js';
 import type { Worker } from 'tesseract.js';
-const { createWorker } = require('tesseract.js');
 import { app } from 'electron';
 import { join } from 'path';
 import { existsSync } from 'fs';
