@@ -72,7 +72,13 @@ export class TesseractProvider implements OCRProvider {
     const langPath = this.getLocalLangPath();
     LoggingService.info(`[TesseractProvider] Initializing worker: lang=${lang}, langPath=${langPath}`);
 
+    // Dynamically resolve node_modules paths to prevent Vite bundler relative path relocation failures in Electron
+    const workerPath = require.resolve('tesseract.js/src/worker-script/node/index.js');
+    const corePath = require.resolve('tesseract.js-core/tesseract-core.wasm.js');
+
     this.worker = await createWorker(lang, 1, {
+      workerPath,
+      corePath,
       langPath,
       cachePath: join(app.getPath('userData'), 'ocr-cache'),
       cacheMethod: 'readOnly',
