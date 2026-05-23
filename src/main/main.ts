@@ -16,6 +16,18 @@ function bootstrap() {
   // Initialize SQLite database and check schema tables
   initDatabase();
 
+  // Print settings to diagnostic log on boot
+  try {
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const dbPath = path.join(app.getPath('userData'), 'snaplingo.db');
+    const db = new Database(dbPath, { readonly: true });
+    const rows = db.prepare('SELECT * FROM settings').all();
+    LoggingService.info('BOOT DATABASE SETTINGS: ' + JSON.stringify(rows));
+  } catch (e: any) {
+    LoggingService.error('FAILED TO READ BOOT SETTINGS: ' + e.message);
+  }
+
   // Bind IPC event listeners
   registerIpcHandlers();
 

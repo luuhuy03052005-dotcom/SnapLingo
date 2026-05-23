@@ -5,6 +5,7 @@ import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema';
 import { DbStatus } from '../../shared/types';
 import { SETTINGS_KEYS } from '../../shared/constants';
+import { LoggingService } from '../logging/LoggingService';
 
 let sqliteDb: Database.Database | null = null;
 let drizzleDb: BetterSQLite3Database<typeof schema> | null = null;
@@ -61,29 +62,34 @@ export function initDatabase(): { db: BetterSQLite3Database<typeof schema>; path
 
     drizzleDb = drizzle(sqliteDb, { schema });
 
-    // Seed default settings if tables are newly created
-    const existingCountResult = sqliteDb.prepare('SELECT COUNT(*) as count FROM settings').get() as { count: number };
-    if (existingCountResult.count === 0) {
-      const now = new Date().toISOString();
-      const insertStmt = sqliteDb.prepare('INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)');
-      
-      const defaults = [
-        [SETTINGS_KEYS.TARGET_LANGUAGE, 'vi'],
-        [SETTINGS_KEYS.SOURCE_LANGUAGE, 'auto'],
-        [SETTINGS_KEYS.TRANSLATION_PROVIDER, 'google'],
-        [SETTINGS_KEYS.OCR_PROVIDER, 'tesseract'],
-        [SETTINGS_KEYS.HISTORY_ENABLED, 'true'],
-        [SETTINGS_KEYS.PRIVACY_MODE, 'false'],
-        [SETTINGS_KEYS.RESTORE_CLIPBOARD, 'true'],
-        [SETTINGS_KEYS.AUTO_CHECK_UPDATES, 'true'],
-        [SETTINGS_KEYS.WINDOW_MODE, 'expanded'],
-        [SETTINGS_KEYS.DEVELOPER_MODE, 'false'],
-        [SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK, 'true']
-      ];
+    // Seed default settings using safe INSERT OR IGNORE to automatically self-heal any missing keys
+    const now = new Date().toISOString();
+    const insertStmt = sqliteDb.prepare('INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)');
+    
+    const defaults = [
+      [SETTINGS_KEYS.TARGET_LANGUAGE, 'vi'],
+      [SETTINGS_KEYS.SOURCE_LANGUAGE, 'auto'],
+      [SETTINGS_KEYS.TRANSLATION_PROVIDER, 'google'],
+      [SETTINGS_KEYS.OCR_PROVIDER, 'tesseract'],
+      [SETTINGS_KEYS.HISTORY_ENABLED, 'true'],
+      [SETTINGS_KEYS.PRIVACY_MODE, 'false'],
+      [SETTINGS_KEYS.RESTORE_CLIPBOARD, 'true'],
+      [SETTINGS_KEYS.AUTO_CHECK_UPDATES, 'true'],
+      [SETTINGS_KEYS.WINDOW_MODE, 'expanded'],
+      [SETTINGS_KEYS.DEVELOPER_MODE, 'false'],
+      [SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK, 'true']
+    ];
 
-      for (const [key, value] of defaults) {
-        insertStmt.run(key, value, now);
-      }
+    for (const [key, value] of defaults) {
+      insertStmt.run(key, value, now);
+    }
+
+    // Auto-heal user config if stuck on an offline libretranslate setting to rescue out-of-the-box usage
+    try {
+      sqliteDb.prepare("UPDATE settings SET value = 'google' WHERE key = 'translationProvider' AND value = 'libretranslate'").run();
+      LoggingService.info('Auto-healed translationProvider to google successfully.');
+    } catch (e: any) {
+      LoggingService.error('Failed to auto-heal translationProvider: ' + e.message);
     }
 
     return { db: drizzleDb, path: dbPath };
