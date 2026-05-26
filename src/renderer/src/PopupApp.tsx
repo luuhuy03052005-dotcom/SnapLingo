@@ -109,8 +109,11 @@ export default function PopupApp() {
 
   return (
     <div className="flex h-screen flex-col bg-white/95 border border-gray-200 rounded-xl shadow-2xl p-3 text-gray-900 select-none overflow-hidden font-sans backdrop-blur-sm">
-      {/* Title Bar */}
-      <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-gray-100">
+      {/* Title Bar - Draggable Region */}
+      <div 
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className="flex items-center justify-between pb-1.5 mb-2 border-b border-gray-100 cursor-move select-none"
+      >
         <div className="flex items-center gap-1.5">
           <img src={logoImg} alt="Logo" className="w-3.5 h-3.5 object-contain" />
           <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">SnapLingo</span>
@@ -118,7 +121,10 @@ export default function PopupApp() {
             <span className="text-[10px] text-blue-500 font-semibold ml-1">{detectedLang} → {targetLang}</span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div 
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="flex items-center gap-1"
+        >
           {privacyMode && <span className="text-[9px] text-teal-500 font-medium">🛡️</span>}
           <button
             onClick={() => setIsPinned(!isPinned)}
