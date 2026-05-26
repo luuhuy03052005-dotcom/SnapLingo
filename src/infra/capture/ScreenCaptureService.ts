@@ -100,11 +100,13 @@ export class ScreenCaptureService {
       writeFileSync(tempPath, cropped.toPNG());
       LoggingService.info(`[ScreenCapture] Temp crop saved: ${tempPath}`);
 
-      // 5. Run OCR
+      // 5. Run OCR with scan mode awareness
       const ocrLang = await settingRepo.get(SETTINGS_KEYS.OCR_LANGUAGE) || 'eng';
+      const scanMode = (await settingRepo.get(SETTINGS_KEYS.SCAN_MODE) || 'document') as 'document' | 'code';
       const ocrResult = await this.ocrProvider.recognize({
         imagePath: tempPath,
-        language: ocrLang
+        language: ocrLang,
+        scanMode
       });
 
       // 6. Check for empty OCR result — do NOT call translation
@@ -116,7 +118,15 @@ export class ScreenCaptureService {
 
       LoggingService.info(`[ScreenCapture] OCR text (${ocrResult.text.length} chars): "${ocrResult.text.substring(0, 50)}..."`);
 
-      // 7. Translate the OCR text using existing Phase 1 use case
+      // 7. Code mode: show raw code directly in popup without translating
+      // Why: Translating code would destroy syntax, variable names, and program logic
+      if (scanMode === 'code') {
+        LoggingService.info('[ScreenCapture] Code mode — skipping translation, showing code popup.');
+        WindowService.createFloatingPopup(`__CODE_SCAN__:${ocrResult.text}`);
+        return;
+      }
+
+      // 8. Document mode: Translate the OCR text using existing Phase 1 use case
       const targetLang = await settingRepo.get(SETTINGS_KEYS.TARGET_LANGUAGE) || 'vi';
       await this.translateUseCase.execute({
         text: ocrResult.text,
@@ -124,7 +134,7 @@ export class ScreenCaptureService {
         sourceType: 'ocr'
       });
 
-      // 8. Show floating popup with OCR text — popup auto-translates via its own useEffect
+      // 9. Show floating popup with OCR text — popup auto-translates via its own useEffect
       WindowService.createFloatingPopup(ocrResult.text);
 
     } catch (error: unknown) {

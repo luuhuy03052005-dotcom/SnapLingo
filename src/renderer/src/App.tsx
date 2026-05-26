@@ -204,30 +204,84 @@ export default function App() {
     </div>
   );
 
-  // ─── IMAGE OCR TAB ───
+  // ─── SCAN TAB (formerly Image OCR) ───
+  const currentScanMode = settings[SETTINGS_KEYS.SCAN_MODE] || 'document';
+  const isCodeMode = currentScanMode === 'code';
+
   const renderImagePanel = () => (
     <div className="flex flex-col h-full gap-4">
+      {/* Scan Mode Toggle — Document vs Code */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-on-surface">Scan</h2>
+        <div className="flex bg-surface-container-high rounded-fluent p-0.5 border border-outline-variant">
+          <button
+            onClick={() => updateSetting(SETTINGS_KEYS.SCAN_MODE, 'document')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-fluent transition-all ${!isCodeMode ? 'bg-primary-container text-white shadow-rest' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >📄 Document</button>
+          <button
+            onClick={() => updateSetting(SETTINGS_KEYS.SCAN_MODE, 'code')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-fluent transition-all ${isCodeMode ? 'bg-emerald-600 text-white shadow-rest' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >💻 Code</button>
+        </div>
+      </div>
+
+      {/* Drop zone */}
       <div className={`fluent-card border-2 border-dashed p-8 text-center cursor-pointer transition-all ${isDragOver ? 'border-primary-container bg-primary-50' : 'border-outline-variant'}`}
         onClick={handleBrowseImage}
         onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={e => { e.preventDefault(); setIsDragOver(false); }}
         onDrop={e => { e.preventDefault(); setIsDragOver(false); const f = e.dataTransfer.files[0]; if (f) { const p = (f as unknown as {path:string}).path; if(p) handleDropImage(p, f.name); } }}>
         {isImageProcessing ? <div className="flex flex-col items-center gap-2"><div className="h-8 w-8 animate-spin rounded-full border-3 border-primary-container border-t-transparent" /><span className="text-sm text-on-surface-variant">Processing OCR...</span></div>
-        : <div className="flex flex-col items-center gap-2"><span className="text-3xl">📷</span><p className="text-sm font-medium text-on-surface">{isDragOver ? 'Drop image here' : 'Click to browse or drag image here'}</p><p className="text-xs text-on-surface-variant">PNG, JPG, BMP, WebP · Max 10MB</p></div>}
+        : <div className="flex flex-col items-center gap-2">
+            <span className="text-3xl">{isCodeMode ? '💻' : '📷'}</span>
+            <p className="text-sm font-medium text-on-surface">{isDragOver ? 'Drop image here' : isCodeMode ? 'Drop code screenshot or click to browse' : 'Click to browse or drag image here'}</p>
+            <p className="text-xs text-on-surface-variant">PNG, JPG, BMP, WebP · Max 10MB{isCodeMode ? ' · Code mode: no translation' : ''}</p>
+          </div>}
       </div>
+
       {imageError && <div className="bg-error-container border border-error/20 rounded-fluent p-3 text-error text-xs">⚠️ {imageError}</div>}
+
+      {/* Results — renders differently based on scan mode */}
       {imageResult?.ocrText && (
-        <div className="grid grid-cols-2 gap-4 flex-1">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">OCR Text</span><span className="text-[10px] text-on-surface-variant">{imageResult.confidence.toFixed(0)}%</span></div>
-            <div className="fluent-input flex-1 p-3 text-sm text-on-surface select-text overflow-y-auto whitespace-pre-wrap min-h-[120px]">{imageResult.ocrText}</div>
-            <button onClick={() => copyToClip(imageResult.ocrText, setCopiedOcr)} className="self-end text-xs text-primary font-medium hover:underline">{copiedOcr ? '✓ Copied' : 'Copy OCR Text'}</button>
+        imageResult.scanMode === 'code' || isCodeMode ? (
+          /* ─── CODE SCAN RESULT ─── */
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-on-surface-variant uppercase">Code Scan Result</span>
+                <span className="text-[10px] text-on-surface-variant">Confidence: {imageResult.confidence.toFixed(0)}%</span>
+              </div>
+              <button onClick={() => copyToClip(imageResult.ocrText, setCopiedOcr)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded-fluent transition flex items-center gap-1.5"
+              >{copiedOcr ? '✓ Copied!' : '📋 Copy Code'}</button>
+            </div>
+            <div className="flex-1 overflow-auto rounded-lg bg-gray-950 border border-gray-800 font-mono text-[12px] leading-relaxed select-text min-h-[200px]">
+              <table className="w-full border-collapse">
+                <tbody>
+                  {imageResult.ocrText.split('\n').map((line: string, i: number) => (
+                    <tr key={i} className="hover:bg-gray-800/50 transition-colors">
+                      <td className="text-right pr-3 pl-3 py-0.5 text-gray-600 select-none border-r border-gray-800 w-[1%] whitespace-nowrap">{i + 1}</td>
+                      <td className="pl-4 pr-3 py-0.5 whitespace-pre text-emerald-300">{line || '\u00A0'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">Translation</span></div>
-            <div className="fluent-input flex-1 p-3 text-sm text-on-surface font-medium select-text overflow-y-auto whitespace-pre-wrap min-h-[120px] bg-surface-container-lowest">{imageResult.translatedText}</div>
-            <button onClick={() => copyToClip(imageResult.translatedText, setCopiedTranslation)} className="self-end text-xs text-primary font-medium hover:underline">{copiedTranslation ? '✓ Copied' : 'Copy Translation'}</button>
+        ) : (
+          /* ─── DOCUMENT SCAN RESULT (original 2-column layout) ─── */
+          <div className="grid grid-cols-2 gap-4 flex-1">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">OCR Text</span><span className="text-[10px] text-on-surface-variant">{imageResult.confidence.toFixed(0)}%</span></div>
+              <div className="fluent-input flex-1 p-3 text-sm text-on-surface select-text overflow-y-auto whitespace-pre-wrap min-h-[120px]">{imageResult.ocrText}</div>
+              <button onClick={() => copyToClip(imageResult.ocrText, setCopiedOcr)} className="self-end text-xs text-primary font-medium hover:underline">{copiedOcr ? '✓ Copied' : 'Copy OCR Text'}</button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">Translation</span></div>
+              <div className="fluent-input flex-1 p-3 text-sm text-on-surface font-medium select-text overflow-y-auto whitespace-pre-wrap min-h-[120px] bg-surface-container-lowest">{imageResult.translatedText}</div>
+              <button onClick={() => copyToClip(imageResult.translatedText, setCopiedTranslation)} className="self-end text-xs text-primary font-medium hover:underline">{copiedTranslation ? '✓ Copied' : 'Copy Translation'}</button>
+            </div>
           </div>
-        </div>
+        )
       )}
     </div>
   );

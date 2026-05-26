@@ -30,6 +30,7 @@ vi.mock('tesseract.js', () => {
           confidence: 89.5,
         },
       }),
+      setParameters: vi.fn().mockResolvedValue(undefined),
       terminate: vi.fn().mockResolvedValue(undefined),
     }),
   };

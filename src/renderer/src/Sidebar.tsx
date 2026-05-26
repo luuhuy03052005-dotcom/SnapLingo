@@ -10,7 +10,7 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, onTabChange, version, isCompact, privacyMode }: SidebarProps) {
   const tabs = [
     { id: 'translator', icon: '文', label: 'Home' },
-    { id: 'image', icon: '📷', label: 'Image OCR' },
+    { id: 'image', icon: '🔍', label: 'Scan' },
     { id: 'history', icon: '🕐', label: 'History' },
     { id: 'settings', icon: '⚙️', label: 'Settings' },
   ];

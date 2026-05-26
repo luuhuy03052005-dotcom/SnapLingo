@@ -66,13 +66,15 @@ export class ImageImportService {
       copyFileSync(filePath, tempPath);
       LoggingService.info(`[ImageImport] Temp copy created: ${tempPath}`);
 
-      // Run OCR
+      // Run OCR with scan mode awareness
       const ocrLang = await settingRepo.get(SETTINGS_KEYS.OCR_LANGUAGE) || 'eng';
-      LoggingService.info(`[ImageImport] Starting OCR: lang=${ocrLang}`);
+      const scanMode = (await settingRepo.get(SETTINGS_KEYS.SCAN_MODE) || 'document') as 'document' | 'code';
+      LoggingService.info(`[ImageImport] Starting OCR: lang=${ocrLang}, scanMode=${scanMode}`);
 
       const ocrResult = await this.ocrProvider.recognize({
         imagePath: tempPath,
-        language: ocrLang
+        language: ocrLang,
+        scanMode
       });
 
       // Check for empty OCR result
@@ -82,7 +84,8 @@ export class ImageImportService {
           ocrText: '',
           confidence: 0,
           translatedText: '',
-          provider: 'none'
+          provider: 'none',
+          scanMode
         };
       }
 
@@ -91,7 +94,20 @@ export class ImageImportService {
         `confidence=${ocrResult.confidence.toFixed(1)}%`
       );
 
-      // Translate
+      // Code mode: skip translation entirely — code doesn't need translating
+      // Why: Translating source code would corrupt syntax, variable names, and logic
+      if (scanMode === 'code') {
+        LoggingService.info('[ImageImport] Code mode — skipping translation step.');
+        return {
+          ocrText: ocrResult.text,
+          confidence: ocrResult.confidence,
+          translatedText: '',
+          provider: 'none (code scan)',
+          scanMode: 'code'
+        };
+      }
+
+      // Document mode: translate as usual
       const targetLang = await settingRepo.get(SETTINGS_KEYS.TARGET_LANGUAGE) || 'vi';
       const translateResult = await this.translateUseCase.execute({
         text: ocrResult.text,
@@ -103,7 +119,8 @@ export class ImageImportService {
         ocrText: ocrResult.text,
         confidence: ocrResult.confidence,
         translatedText: translateResult.translatedText,
-        provider: translateResult.provider
+        provider: translateResult.provider,
+        scanMode: 'document'
       };
 
     } catch (error: unknown) {

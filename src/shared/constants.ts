@@ -65,5 +65,6 @@ export const SETTINGS_KEYS = {
   OCR_LANGUAGE: 'ocrLanguage', // 'eng' | 'vie' etc.
   ALLOW_CDN_OCR: 'allowCdnOcr', // 'true' | 'false'
   DEVELOPER_MODE: 'developerMode', // 'true' | 'false'
-  ALLOW_PROVIDER_FALLBACK: 'allowProviderFallback' // 'true' | 'false'
+  ALLOW_PROVIDER_FALLBACK: 'allowProviderFallback', // 'true' | 'false'
+  SCAN_MODE: 'scanMode' // 'document' | 'code'
 } as const;

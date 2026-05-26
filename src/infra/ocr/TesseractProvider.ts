@@ -6,6 +6,8 @@ import { existsSync } from 'fs';
 import { OCRProvider } from '../../core/ports/OCRProvider';
 import { OCRInput, OCRResult } from '../../shared/types';
 import { LoggingService } from '../logging/LoggingService';
+import { CodeTextNormalizer } from './CodeTextNormalizer';
+import { DocumentTextNormalizer } from './DocumentTextNormalizer';
 
 /**
  * Tesseract.js OCR Provider — local-first, offline-capable.
@@ -94,6 +96,7 @@ export class TesseractProvider implements OCRProvider {
 
   async recognize(input: OCRInput): Promise<OCRResult> {
     const lang = input.language || 'eng';
+    const scanMode = input.scanMode || 'document';
 
     // Guard: validate traineddata exists before attempting OCR
     if (!this.validateLanguageFile(lang)) {
@@ -103,16 +106,30 @@ export class TesseractProvider implements OCRProvider {
       );
     }
 
-    LoggingService.info(`[TesseractProvider] Starting OCR: lang=${lang}, image=${input.imagePath}`);
+    LoggingService.info(`[TesseractProvider] Starting OCR: lang=${lang}, mode=${scanMode}, image=${input.imagePath}`);
 
     const worker = await this.ensureWorker(lang);
+
+    // Set Tesseract PSM based on scan mode:
+    // Code: PSM 6 (single uniform block) — preserves layout/indentation
+    // Document: PSM 3 (auto) — optimal for paragraphs and mixed content
+    const psm = scanMode === 'code' ? '6' : '3';
+    await worker.setParameters({ tessedit_pageseg_mode: psm });
+
     const { data } = await worker.recognize(input.imagePath);
 
-    const text = (data.text || '').trim();
+    const rawText = (data.text || '').trim();
     const confidence = data.confidence ?? 0;
 
+    // Apply mode-specific post-processing normalizer
+    // Why: Code and document text have fundamentally different structure requirements
+    const text = scanMode === 'code'
+      ? CodeTextNormalizer.normalize(rawText)
+      : DocumentTextNormalizer.normalize(rawText);
+
     LoggingService.info(
-      `[TesseractProvider] OCR complete: ${text.length} chars, confidence=${confidence.toFixed(1)}%`
+      `[TesseractProvider] OCR complete: ${text.length} chars (raw: ${rawText.length}), ` +
+      `confidence=${confidence.toFixed(1)}%, mode=${scanMode}`
     );
 
     return { text, confidence };

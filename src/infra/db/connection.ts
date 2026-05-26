@@ -77,7 +77,8 @@ export function initDatabase(): { db: BetterSQLite3Database<typeof schema>; path
       [SETTINGS_KEYS.AUTO_CHECK_UPDATES, 'true'],
       [SETTINGS_KEYS.WINDOW_MODE, 'expanded'],
       [SETTINGS_KEYS.DEVELOPER_MODE, 'false'],
-      [SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK, 'true']
+      [SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK, 'true'],
+      [SETTINGS_KEYS.SCAN_MODE, 'document']
     ];
 
     for (const [key, value] of defaults) {

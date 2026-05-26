@@ -55,6 +55,13 @@ export interface HistoryRecord {
 }
 
 /**
+ * Scan mode discriminator — determines OCR post-processing pipeline.
+ * Why: Code scanning needs indentation preservation and symbol fix,
+ * while document scanning needs paragraph joining and whitespace normalization.
+ */
+export type ScanMode = 'document' | 'code';
+
+/**
  * Screen selection rectangle (CSS pixel coordinates).
  */
 export interface SelectionRect {
@@ -70,6 +77,7 @@ export interface SelectionRect {
 export interface OCRInput {
   imagePath: string;
   language?: string;
+  scanMode?: ScanMode;
 }
 
 /**
@@ -78,6 +86,16 @@ export interface OCRInput {
 export interface OCRResult {
   text: string;
   confidence: number;
+  lines?: OCRLine[];
+}
+
+/**
+ * Individual OCR line with optional bounding box (per blueprint 06_OCR_SPEC).
+ */
+export interface OCRLine {
+  text: string;
+  confidence?: number;
+  bbox?: { x: number; y: number; width: number; height: number };
 }
 
 /**
@@ -88,6 +106,7 @@ export interface ImageOCRResult {
   confidence: number;
   translatedText: string;
   provider: string;
+  scanMode?: ScanMode;
 }
 
 /**
