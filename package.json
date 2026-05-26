@@ -43,6 +43,7 @@
     "appId": "com.antigravity.snaplingo",
     "productName": "SnapLingo",
     "asar": true,
+    "icon": "resources/icon.png",
     "directories": {
       "output": "dist"
     },
@@ -57,7 +58,8 @@
       "repo": "snaplingo"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "resources/icon.png"
     },
     "extraResources": [
       {
