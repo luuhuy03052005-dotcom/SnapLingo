@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { TranslationResult } from '../../shared/types';
+import { TranslationResult, OCRTextPayload } from '../../shared/types';
 import logoImg from './Logo.png';
+import { IconAddToTranslator, IconTranslateNow, IconCopy } from './components/Icons';
 
 /**
  * Utility to strip Electron IPC error wrappers and standard "Error:" prefixes
@@ -118,6 +119,32 @@ export default function PopupApp() {
     window.close();
   };
 
+  /**
+   * Send OCR text to main translator panel.
+   * Why: User wants to review/edit OCR text before translating, or translate immediately.
+   */
+  const sendToMain = async (autoTranslate: boolean) => {
+    if (!originalText || !window.snaplingo) return;
+    const payload: OCRTextPayload = {
+      text: isCodeScan ? codeText : originalText,
+      source: 'screen-snip',
+      mode: isCodeScan ? 'code' : 'document',
+      createdAt: new Date().toISOString()
+    };
+    try {
+      // Send typed payload, then encode autoTranslate flag in the payload text
+      // The main window will handle auto-translate based on a separate signal
+      if (autoTranslate) {
+        (payload as any).autoTranslate = true;
+      }
+      await window.snaplingo.ocr.sendTextToMain(payload);
+      // Bring main window to focus and close popup
+      window.close();
+    } catch (err) {
+      console.error('Failed to send text to main:', err);
+    }
+  };
+
   // Code scan lines with line numbers for professional display
   const codeLines = codeText.split('\n');
 
@@ -202,14 +229,21 @@ export default function PopupApp() {
         </div>
         <div className="flex items-center gap-1.5">
           {copied && <span className="text-[10px] text-emerald-500 font-semibold animate-pulse">Copied!</span>}
-          {!isCodeScan && (
-            <button onClick={handleOpenFull}
-              className="text-gray-400 hover:text-blue-500 text-[10px] px-2 py-0.5 rounded transition border border-gray-200 hover:border-blue-200"
-            >Open Full</button>
+          {!isCodeScan && !isLoading && !errorMsg && originalText && (
+            <>
+              <button onClick={() => sendToMain(false)}
+                className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-[10px] px-2 py-0.5 rounded transition border border-gray-200 hover:border-blue-200"
+                title="Add OCR text to translator input without auto-translating"
+              ><IconAddToTranslator className="w-3 h-3" /> Add to Translator</button>
+              <button onClick={() => sendToMain(true)}
+                className="flex items-center gap-1 text-white bg-blue-500 hover:bg-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-lg transition"
+                title="Add OCR text to translator and translate immediately"
+              ><IconTranslateNow className="w-3 h-3" /> Translate Now</button>
+            </>
           )}
           <button disabled={isLoading || !!errorMsg || (!translatedText && !codeText)} onClick={handleCopy}
-            className={`disabled:opacity-30 text-white text-[10px] font-bold px-3 py-1 rounded-lg transition ${isCodeScan ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-          >{isCodeScan ? '📋 Copy Code' : '📋 Copy'}</button>
+            className={`flex items-center gap-1 disabled:opacity-30 text-white text-[10px] font-bold px-3 py-1 rounded-lg transition ${isCodeScan ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-500 hover:bg-blue-600'}`}
+          ><IconCopy className="w-3 h-3" /> {isCodeScan ? 'Copy Code' : 'Copy'}</button>
         </div>
       </div>
     </div>

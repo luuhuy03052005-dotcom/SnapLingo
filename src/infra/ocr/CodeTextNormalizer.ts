@@ -54,29 +54,42 @@ export class CodeTextNormalizer {
     return text
       .split('\n')
       .map(line => {
-        // Fix curly braces: common misread as parentheses in code context
-        // Only fix when surrounded by code patterns (not inside strings)
         let fixed = line;
 
-        // Fix common semicolon misreads: ':' at end of statement lines
-        // (but only when not in a label/ternary context)
-        fixed = fixed.replace(/;$/g, ';'); // Already correct, just normalize
-
-        // Fix angle brackets commonly misread in HTML/JSP
+        // Fix angle brackets and XML/HTML entities
         fixed = fixed.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        fixed = fixed.replace(/&amp;/g, '&');
 
-        // Fix zero vs capital O in obvious numeric contexts
-        // e.g., "number0l" → "number01" when surrounded by digits
+        // Fix JSP/HTML tag spacing misreads
+        // e.g. "< % @" -> "<%@", "% >" -> "%>"
+        fixed = fixed.replace(/<\s*%\s*@/g, '<%@');
+        fixed = fixed.replace(/<\s*%/g, '<%');
+        fixed = fixed.replace(/%\s*>/g, '%>');
+        fixed = fixed.replace(/<\s*\/\s*/g, '</');
+        fixed = fixed.replace(/\/\s*>/g, '/>');
+
+        // Fix zero vs capital O and lowercase L vs 1 in numeric/code contexts
         fixed = fixed.replace(/(\d)O(\d)/g, '$10$2');
         fixed = fixed.replace(/(\d)l(\d)/g, '$11$2');
 
-        // Fix pipe character misread as lowercase L or uppercase I
-        // in obvious pipe contexts (e.g., "||" logical OR)
-        fixed = fixed.replace(/\bl\|/g, '||');
-        fixed = fixed.replace(/\|l\b/g, '||');
-        fixed = fixed.replace(/l l/g, '| |');
+        // Fix logical OR operators (||) misreads
+        // Matches visual combinations of I, l, 1, | where at least one is a pipe |
+        fixed = fixed.replace(/[Il1\|]{2}/g, (match) => {
+          if (match.includes('|')) return '||';
+          return match;
+        });
 
-        // Fix equals sign artifacts
+        // Fix visual logical AND (&&) misreads
+        // e.g. "8&", "&8", "aamp;"
+        fixed = fixed.replace(/&amp;/g, '&');
+        fixed = fixed.replace(/8&/g, '&&').replace(/&8/g, '&&');
+
+        // Fix visual curly braces misreads
+        // e.g. "){" -> ") {", "closs" -> "class"
+        fixed = fixed.replace(/closs\b/g, 'class');
+        fixed = fixed.replace(/\bimport\s+[^;]+1\s*$/g, (m) => m.slice(0, -1) + ';'); // fix import line trailing 1 to ;
+
+        // Fix assignment operator visual misreads
         fixed = fixed.replace(/≡/g, '===');
         fixed = fixed.replace(/≠/g, '!==');
 

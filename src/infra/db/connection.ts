@@ -6,6 +6,7 @@ import * as schema from './schema';
 import { DbStatus } from '../../shared/types';
 import { SETTINGS_KEYS } from '../../shared/constants';
 import { LoggingService } from '../logging/LoggingService';
+import { MigrationRunner } from './MigrationRunner';
 
 let sqliteDb: Database.Database | null = null;
 let drizzleDb: BetterSQLite3Database<typeof schema> | null = null;
@@ -28,37 +29,7 @@ export function initDatabase(): { db: BetterSQLite3Database<typeof schema>; path
     sqliteDb = new Database(dbPath);
 
     // Run programmatic migrations to initialize structures reliably on target computers.
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS translation_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_text TEXT NOT NULL,
-        translated_text TEXT NOT NULL,
-        source_language TEXT,
-        target_language TEXT NOT NULL,
-        source_type TEXT NOT NULL,
-        provider TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS glossary (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_term TEXT NOT NULL,
-        target_term TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS translation_cache (
-        hash TEXT PRIMARY KEY,
-        source_text TEXT NOT NULL,
-        translated_text TEXT NOT NULL,
-        target_language TEXT NOT NULL,
-        provider TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `);
+    MigrationRunner.runMigrations(sqliteDb);
 
     drizzleDb = drizzle(sqliteDb, { schema });
 
@@ -78,7 +49,17 @@ export function initDatabase(): { db: BetterSQLite3Database<typeof schema>; path
       [SETTINGS_KEYS.WINDOW_MODE, 'expanded'],
       [SETTINGS_KEYS.DEVELOPER_MODE, 'false'],
       [SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK, 'true'],
-      [SETTINGS_KEYS.SCAN_MODE, 'document']
+      [SETTINGS_KEYS.SCAN_MODE, 'document'],
+      ['performanceMode', 'balanced'],
+      ['allowCloudTranslation', 'false'],
+      ['allowCloudOCR', 'false'],
+      ['saveTranslationHistory', 'true'],
+      ['ocrDefaultLanguages', 'eng'],
+      ['ocrMaxRetry', '1'],
+      ['ocrWorkerIdleTimeoutMs', '900000'],
+      ['posMaxTextLength', '2000'],
+      ['translationMaxTextLength', '5000'],
+      ['translationCacheEnabled', 'true']
     ];
 
     for (const [key, value] of defaults) {

@@ -35,7 +35,9 @@ export const IPC_CHANNELS = {
     CANCEL_SCREEN_SELECTION: 'ocr:cancelScreenSelection',
     SUBMIT_SELECTION: 'ocr:submitSelection',
     IMPORT_IMAGE: 'ocr:importImage',
-    RECOGNIZE_IMAGE: 'ocr:recognizeImage'
+    RECOGNIZE_IMAGE: 'ocr:recognizeImage',
+    SEND_TEXT_TO_MAIN: 'ocr:sendTextToMain',
+    TEXT_RECEIVED: 'ocr:textReceived'
   },
   GLOSSARY: {
     GET_ALL: 'glossary:getAll',
@@ -46,6 +48,9 @@ export const IPC_CHANNELS = {
   CACHE: {
     CLEAR: 'cache:clear',
     GET_STATS: 'cache:getStats'
+  },
+  VOCABULARY: {
+    ANALYZE: 'vocabulary:analyze'
   }
 } as const;
 

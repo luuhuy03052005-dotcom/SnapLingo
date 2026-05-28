@@ -1,4 +1,4 @@
-import { BrowserWindow, shell, app, screen } from 'electron';
+import { BrowserWindow, shell, app, screen, nativeImage } from 'electron';
 import { join } from 'path';
 import { LoggingService } from '../../infra/logging/LoggingService';
 
@@ -24,6 +24,14 @@ export const WindowService = {
 
     LoggingService.info('Creating main application window.');
 
+    // Load the official SnapLingo icon for taskbar and title bar
+    const iconPath = join(__dirname, '../../resources/icon.png');
+    let windowIcon: Electron.NativeImage | undefined;
+    try {
+      windowIcon = nativeImage.createFromPath(iconPath);
+      if (windowIcon.isEmpty()) windowIcon = undefined;
+    } catch { windowIcon = undefined; }
+
     mainWindow = new BrowserWindow({
       width: 800,
       height: 600,
@@ -32,6 +40,7 @@ export const WindowService = {
       show: false,
       autoHideMenuBar: true,
       title: 'SnapLingo',
+      icon: windowIcon,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false,
@@ -112,6 +121,7 @@ export const WindowService = {
   getWindowMode(): 'compact' | 'expanded' {
     return currentMode;
   },
+
 
   /**
    * Spawns borderless, always-on-top floating popup near current mouse coordinates.

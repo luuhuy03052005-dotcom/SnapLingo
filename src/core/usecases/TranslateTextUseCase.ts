@@ -7,13 +7,17 @@ import { GlossaryRepository, GlossaryTerm } from '../../infra/db/GlossaryReposit
 import { CacheRepository } from '../../infra/db/CacheRepository';
 import { DEV_MODE_TERMS } from '../../shared/devTerms';
 import { LoggingService } from '../../infra/logging/LoggingService';
+import { MemoryLRUCache } from '../../infra/cache/MemoryLRUCache';
 
 /**
- * Translate Text UseCase — Phase 4 upgraded.
- * Why: Adds glossary term protection, translation cache, Developer Mode,
- *      and safe provider fallback while preserving privacy enforcement.
+ * Translate Text UseCase — Phase 4 Upgraded.
+ * Why: Adds glossary term protection, double-layer caching (Memory LRU + SQLite),
+ *      Developer Mode, and safe provider fallback while strictly preserving privacy rules.
  */
 export class TranslateTextUseCase {
+  // Layer 1: High-Performance Memory Cache (persistent across execution sessions)
+  private memCache = new MemoryLRUCache<TranslationResult>();
+
   constructor(
     private settingRepo: SettingRepository,
     private historyRepo: TranslationHistoryRepository,
@@ -29,14 +33,16 @@ export class TranslateTextUseCase {
     }
 
     // 1. Load settings
-    const [configuredProvider, privacyMode, historyEnabled, devMode, allowFallback] = await Promise.all([
+    const [configuredProvider, privacyMode, historyEnabled, devMode, allowFallback, cacheEnabledSetting] = await Promise.all([
       this.settingRepo.get(SETTINGS_KEYS.TRANSLATION_PROVIDER),
       this.settingRepo.get(SETTINGS_KEYS.PRIVACY_MODE),
       this.settingRepo.get(SETTINGS_KEYS.HISTORY_ENABLED),
       this.settingRepo.get(SETTINGS_KEYS.DEVELOPER_MODE),
-      this.settingRepo.get(SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK)
+      this.settingRepo.get(SETTINGS_KEYS.ALLOW_PROVIDER_FALLBACK),
+      this.settingRepo.get('translationCacheEnabled')
     ]);
     const isPrivacy = privacyMode === 'true';
+    const isCacheActive = !isPrivacy && cacheEnabledSetting !== 'false';
 
     // 2. Choose primary provider
     let primaryProvider: TranslationProvider = this.googleFreeProvider;
@@ -46,27 +52,45 @@ export class TranslateTextUseCase {
       providerName = 'libretranslate';
     }
 
-    // 3. Check cache (skip if Privacy Mode is on)
-    if (!isPrivacy) {
-      const hash = CacheRepository.generateHash(input.text, input.targetLanguage, providerName);
+    // 3. Double-Layer Cache Lookup (skip if Privacy Mode is active or cache is disabled)
+    let hash = '';
+    if (isCacheActive) {
+      hash = CacheRepository.generateHash(input.text, input.targetLanguage, providerName);
       try {
+        // Layer 1 Check: Memory LRU
+        const memoryHit = this.memCache.get(hash);
+        if (memoryHit) {
+          LoggingService.debug(`[Translate] Memory Cache hit: ${hash.substring(0, 8)}...`);
+          return { translatedText: memoryHit.translatedText, provider: `${memoryHit.provider} (memcached)` };
+        }
+
+        // Layer 2 Check: SQLite DB Cache
         const cached = await this.cacheRepo.get(hash);
         if (cached) {
-          LoggingService.debug(`[Translate] Cache hit: ${hash.substring(0, 8)}...`);
-          return { translatedText: cached.translatedText, provider: `${cached.provider} (cached)` };
+          LoggingService.debug(`[Translate] DB Cache hit: ${hash.substring(0, 8)}...`);
+          const hitResult: TranslationResult = {
+            translatedText: cached.translatedText,
+            provider: `${cached.provider} (cached)`
+          };
+          // Hydrate Layer 1 cache for future speedups
+          this.memCache.set(hash, hitResult);
+          return hitResult;
         }
-      } catch (e) { LoggingService.warn(`[Translate] Cache lookup failed: ${e}`); }
+      } catch (e) {
+        LoggingService.warn(`[Translate] Cache lookup failed: ${e}`);
+      }
     }
 
     // 4. Build glossary terms (user glossary + developer mode preset)
     let allTerms: GlossaryTerm[] = [];
     try {
       allTerms = await this.glossaryRepo.getAll();
-    } catch (e) { LoggingService.warn(`[Translate] Glossary load failed: ${e}`); }
+    } catch (e) {
+      LoggingService.warn(`[Translate] Glossary load failed: ${e}`);
+    }
 
     if (devMode === 'true') {
-      // Merge dev preset terms (avoid duplicates by sourceTerm)
-      const existingSources = new Set(allTerms.map(t => t.sourceTerm.toLowerCase()));
+      const existingSources = new Set(allTerms.map((t) => t.sourceTerm.toLowerCase()));
       for (const dt of DEV_MODE_TERMS) {
         if (!existingSources.has(dt.sourceTerm.toLowerCase())) {
           allTerms.push({ sourceTerm: dt.sourceTerm, targetTerm: dt.targetTerm, createdAt: '' });
@@ -93,7 +117,6 @@ export class TranslateTextUseCase {
       result = await primaryProvider.translate({ ...input, text: processedText });
     } catch (primaryError) {
       LoggingService.error(`[Translate] Primary provider failed: ${primaryError}`);
-      // Fallback only if user allows it
       if (allowFallback === 'true') {
         const fallbackProvider = configuredProvider === 'libretranslate' ? this.googleFreeProvider : this.libreProvider;
         const fallbackName = configuredProvider === 'libretranslate' ? 'google-free' : 'libretranslate';
@@ -103,7 +126,7 @@ export class TranslateTextUseCase {
           result.provider = `${result.provider} (fallback)`;
         } catch (fallbackError) {
           LoggingService.error(`[Translate] Fallback also failed: ${fallbackError}`);
-          throw primaryError; // Throw original error
+          throw primaryError;
         }
       } else {
         throw primaryError;
@@ -117,28 +140,41 @@ export class TranslateTextUseCase {
     }
     result.translatedText = finalText;
 
-    // 8. Save to cache (skip if Privacy Mode)
-    if (!isPrivacy) {
+    // 8. Save to Double-Layer Cache
+    if (isCacheActive) {
       try {
-        const hash = CacheRepository.generateHash(input.text, input.targetLanguage, result.provider.replace(' (fallback)', ''));
+        const primaryHash = CacheRepository.generateHash(input.text, input.targetLanguage, result.provider.replace(' (fallback)', '').replace(' (cached)', '').replace(' (memcached)', ''));
+        // Save to DB
         await this.cacheRepo.set({
-          hash, sourceText: input.text, translatedText: result.translatedText,
-          targetLanguage: input.targetLanguage, provider: result.provider,
+          hash: primaryHash,
+          sourceText: input.text,
+          translatedText: result.translatedText,
+          targetLanguage: input.targetLanguage,
+          provider: result.provider,
           createdAt: new Date().toISOString()
         });
-      } catch (e) { LoggingService.warn(`[Translate] Cache save failed: ${e}`); }
+        // Save to Memory LRU
+        this.memCache.set(primaryHash, result);
+      } catch (e) {
+        LoggingService.warn(`[Translate] Cache save failed: ${e}`);
+      }
     }
 
     // 9. Save to history (skip if disabled or Privacy Mode)
     if (historyEnabled === 'true' && !isPrivacy) {
       try {
         await this.historyRepo.save({
-          sourceText: input.text, translatedText: result.translatedText,
+          sourceText: input.text,
+          translatedText: result.translatedText,
           sourceLanguage: input.sourceLanguage || result.detectedLanguage || 'auto',
-          targetLanguage: input.targetLanguage, sourceType: input.sourceType || 'text',
-          provider: result.provider, createdAt: new Date().toISOString()
+          targetLanguage: input.targetLanguage,
+          sourceType: input.sourceType || 'text',
+          provider: result.provider,
+          createdAt: new Date().toISOString()
         });
-      } catch (e) { console.error('Failed to log translation history:', e); }
+      } catch (e) {
+        console.error('Failed to log translation history:', e);
+      }
     }
 
     return result;

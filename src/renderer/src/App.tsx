@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
-import { AppSettings, DbStatus, UpdateStatus, HistoryRecord, TranslationResult, ImageOCRResult } from '../../shared/types';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { AppSettings, DbStatus, UpdateStatus, HistoryRecord, TranslationResult, ImageOCRResult, OCRTextPayload } from '../../shared/types';
 import { SETTINGS_KEYS } from '../../shared/constants';
 import Sidebar from './Sidebar';
+import { POSLegend } from './components/POSLegend';
+import { WordTokenHighlighter } from './components/WordTokenHighlighter';
+import { OCRResultPanel } from './components/OCRResultPanel';
+import { IconTranslate, IconScreenSnip, IconAnalyze, IconCopy, IconLocalProcessing } from './components/Icons';
+import { POSToken } from '../../shared/vocabularyTypes';
 
 /**
  * Utility to strip Electron IPC error wrappers and standard "Error:" prefixes
@@ -43,6 +48,37 @@ export default function App() {
   const [newGlossarySource, setNewGlossarySource] = useState('');
   const [newGlossaryTarget, setNewGlossaryTarget] = useState('');
   const [cacheStats, setCacheStats] = useState<{ count: number }>({ count: 0 });
+
+  // POS Highlighter State Variables
+  const [isAnalyzeOpen, setIsAnalyzeOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzeTokens, setAnalyzeTokens] = useState<POSToken[]>([]);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // Screen Snip OCR Result — persisted in Main App, not just popup
+  const [ocrSnipText, setOcrSnipText] = useState<string>('');
+  const [ocrSnipVisible, setOcrSnipVisible] = useState(false);
+
+  // Listen for OCR text forwarded from floating popup via IPC
+  useEffect(() => {
+    if (!window.snaplingo) return;
+    const cleanup = window.snaplingo.ocr.onTextReceived((payload: OCRTextPayload) => {
+      if (!payload?.text) return;
+      setOcrSnipText(payload.text);
+      setOcrSnipVisible(true);
+      setActiveTab('translator');
+
+      // If autoTranslate flag is set, push text to source and translate
+      if ((payload as any).autoTranslate) {
+        setSourceText(payload.text);
+        // Delay to allow state to settle, then trigger translate
+        setTimeout(() => {
+          handleTranslateRef.current();
+        }, 100);
+      }
+    });
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -118,6 +154,10 @@ export default function App() {
     } catch (e: unknown) { setTranslateError(cleanIpcError(e)); }
     finally { setIsTranslating(false); }
   };
+
+  // Stable ref for handleTranslate so IPC listener can call the latest version
+  const handleTranslateRef = useRef(handleTranslate);
+  useEffect(() => { handleTranslateRef.current = handleTranslate; });
   const copyToClip = async (text: string, setter: (v: boolean) => void) => {
     await navigator.clipboard.writeText(text); setter(true); setTimeout(() => setter(false), 1500);
   };
@@ -149,6 +189,32 @@ export default function App() {
     catch (e: unknown) { setUpdateStatus({ status: 'error', message: cleanIpcError(e) }); }
   };
 
+  const handleAnalyzeVocabulary = async (textToAnalyze: string) => {
+    if (!textToAnalyze?.trim()) {
+      setAnalyzeError('No text available for analysis.');
+      setIsAnalyzeOpen(true);
+      return;
+    }
+
+    setAnalyzeError(null);
+    setAnalyzeTokens([]);
+    setIsAnalyzing(true);
+    setIsAnalyzeOpen(true);
+
+    try {
+      if (!window.snaplingo) {
+        throw new Error('SnapLingo API is not available.');
+      }
+      const tokens = await window.snaplingo.vocabulary.analyze(textToAnalyze);
+      setAnalyzeTokens(tokens);
+    } catch (e: any) {
+      console.error('POS Analysis failed:', e);
+      setAnalyzeError(cleanIpcError(e));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const privacyMode = settings[SETTINGS_KEYS.PRIVACY_MODE] === 'true';
   const isCompact = windowMode === 'compact';
 
@@ -160,7 +226,26 @@ export default function App() {
 
   // ─── TRANSLATOR TAB ───
   const renderTranslatorPanel = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full gap-4">
+      {/* OCR Snip Result Panel — persistent OCR text from Screen Snip */}
+      <OCRResultPanel
+        text={ocrSnipText}
+        isVisible={ocrSnipVisible}
+        onTextChange={setOcrSnipText}
+        onAddToTranslator={() => {
+          setSourceText(ocrSnipText);
+          setOcrSnipVisible(false);
+        }}
+        onTranslateNow={() => {
+          setSourceText(ocrSnipText);
+          setOcrSnipVisible(false);
+          setTimeout(() => handleTranslateRef.current(), 100);
+        }}
+        onAnalyze={() => handleAnalyzeVocabulary(ocrSnipText)}
+        onCopy={() => navigator.clipboard.writeText(ocrSnipText)}
+        onClear={() => { setOcrSnipText(''); setOcrSnipVisible(false); }}
+      />
+
       <div className="flex-1 grid grid-cols-2 gap-4">
         <div className="flex flex-col">
           <div className="flex items-center justify-between mb-2">
@@ -173,7 +258,7 @@ export default function App() {
             placeholder="Type text, paste an image, or use Screen Snip..."
             className="fluent-input flex-1 p-3 text-sm text-on-surface resize-none min-h-[200px] select-text" />
           <div className="flex items-center gap-1.5 mt-2 text-[11px] text-on-surface-variant">
-            <span className="text-teal">🔒</span><span>Local processing active</span>
+            <IconLocalProcessing className="w-3.5 h-3.5 text-teal" /><span>Local processing active</span>
           </div>
         </div>
         <div className="flex flex-col">
@@ -182,9 +267,21 @@ export default function App() {
               value={settings[SETTINGS_KEYS.TARGET_LANGUAGE] || 'vi'} onChange={e => updateSetting(SETTINGS_KEYS.TARGET_LANGUAGE, e.target.value)}>
               <option value="vi">Vietnamese</option><option value="en">English</option><option value="ja">Japanese</option>
             </select>
-            <div className="flex gap-2">
+            <div className="flex gap-2.5 items-center">
+              {(translatedResult || sourceText) && (
+                <button
+                  onClick={() => {
+                    const isEn = settings[SETTINGS_KEYS.TARGET_LANGUAGE] === 'en';
+                    handleAnalyzeVocabulary(isEn ? translatedResult : sourceText);
+                  }}
+                  className="text-xs font-bold px-2.5 py-1 bg-primary-container/20 dark:bg-primary-container/40 text-primary hover:bg-primary-container/30 dark:hover:bg-primary-container/50 rounded-lg transition"
+                  title="Analyze English Vocabulary (POS)"
+                >
+                  <IconAnalyze className="w-3.5 h-3.5 inline" /> Analyze
+                </button>
+              )}
               <button onClick={() => translatedResult && copyToClip(translatedResult, setCopiedText)}
-                className="text-on-surface-variant hover:text-primary text-base" title="Copy">{copiedText ? '✓' : '📋'}</button>
+                className="text-on-surface-variant hover:text-primary" title="Copy">{copiedText ? <span className="text-sm">✓</span> : <IconCopy className="w-4 h-4" />}</button>
               <button className="text-on-surface-variant hover:text-primary text-base" title="Listen">🔊</button>
             </div>
           </div>
@@ -195,10 +292,43 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* POS Highlight Analysis Sub-Panel */}
+      {isAnalyzeOpen && (
+        <div className="mt-4 p-4 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all duration-300">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <IconAnalyze className="w-4 h-4" /> English Part-of-Speech Analysis
+            </h3>
+            <button
+              onClick={() => setIsAnalyzeOpen(false)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-semibold"
+            >
+              ✕ Close
+            </button>
+          </div>
+          {isAnalyzing ? (
+            <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              <span>Analyzing parts of speech...</span>
+            </div>
+          ) : analyzeError ? (
+            <div className="text-red-500 text-sm">⚠️ {analyzeError}</div>
+          ) : (
+            <>
+              <POSLegend />
+              <div className="bg-slate-50/80 dark:bg-slate-800/40 p-4 rounded-lg border border-slate-100 dark:border-slate-800 max-h-[300px] overflow-y-auto mt-2 select-text">
+                <WordTokenHighlighter tokens={analyzeTokens} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-center mt-4">
         <button onClick={handleTranslate} disabled={isTranslating}
           className="bg-primary-container hover:bg-primary text-white font-semibold text-sm px-8 py-2.5 rounded-fluent transition disabled:opacity-50 shadow-rest flex items-center gap-2">
-          {isTranslating ? 'Translating...' : '🌐 Translate'}
+          {isTranslating ? 'Translating...' : <><IconTranslate className="w-4 h-4" /> Translate</>}
         </button>
       </div>
     </div>
@@ -269,17 +399,65 @@ export default function App() {
           </div>
         ) : (
           /* ─── DOCUMENT SCAN RESULT (original 2-column layout) ─── */
-          <div className="grid grid-cols-2 gap-4 flex-1">
-            <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">OCR Text</span><span className="text-[10px] text-on-surface-variant">{imageResult.confidence.toFixed(0)}%</span></div>
-              <div className="fluent-input flex-1 p-3 text-sm text-on-surface select-text overflow-y-auto whitespace-pre-wrap min-h-[120px]">{imageResult.ocrText}</div>
-              <button onClick={() => copyToClip(imageResult.ocrText, setCopiedOcr)} className="self-end text-xs text-primary font-medium hover:underline">{copiedOcr ? '✓ Copied' : 'Copy OCR Text'}</button>
+          <div className="flex flex-col gap-4 flex-1">
+            <div className="grid grid-cols-2 gap-4 flex-1">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-on-surface-variant uppercase">OCR Text</span>
+                  <div className="flex items-center gap-2">
+                    {imageResult.ocrText && (
+                      <button
+                        onClick={() => handleAnalyzeVocabulary(imageResult.ocrText)}
+                        className="text-[10px] font-bold px-2 py-0.5 bg-primary-container/20 dark:bg-primary-container/40 text-primary hover:bg-primary-container/30 dark:hover:bg-primary-container/50 rounded-lg transition"
+                        title="Analyze English POS"
+                      >
+                        ✨ Analyze
+                      </button>
+                    )}
+                    <span className="text-[10px] text-on-surface-variant">{imageResult.confidence.toFixed(0)}%</span>
+                  </div>
+                </div>
+                <div className="fluent-input flex-1 p-3 text-sm text-on-surface select-text overflow-y-auto whitespace-pre-wrap min-h-[120px]">{imageResult.ocrText}</div>
+                <button onClick={() => copyToClip(imageResult.ocrText, setCopiedOcr)} className="self-end text-xs text-primary font-medium hover:underline">{copiedOcr ? '✓ Copied' : 'Copy OCR Text'}</button>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">Translation</span></div>
+                <div className="fluent-input flex-1 p-3 text-sm text-on-surface font-medium select-text overflow-y-auto whitespace-pre-wrap min-h-[120px] bg-surface-container-lowest">{imageResult.translatedText}</div>
+                <button onClick={() => copyToClip(imageResult.translatedText, setCopiedTranslation)} className="self-end text-xs text-primary font-medium hover:underline">{copiedTranslation ? '✓ Copied' : 'Copy Translation'}</button>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center"><span className="text-xs font-bold text-on-surface-variant uppercase">Translation</span></div>
-              <div className="fluent-input flex-1 p-3 text-sm text-on-surface font-medium select-text overflow-y-auto whitespace-pre-wrap min-h-[120px] bg-surface-container-lowest">{imageResult.translatedText}</div>
-              <button onClick={() => copyToClip(imageResult.translatedText, setCopiedTranslation)} className="self-end text-xs text-primary font-medium hover:underline">{copiedTranslation ? '✓ Copied' : 'Copy Translation'}</button>
-            </div>
+
+            {/* POS Highlight Analysis Sub-Panel for OCR Scans */}
+            {isAnalyzeOpen && (
+              <div className="p-4 bg-surface-container rounded-fluent border border-outline/25 shadow-sm transition-all duration-300">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-sm font-bold text-on-surface flex items-center gap-1.5">
+                    📊 English Part-of-Speech Analysis
+                  </h3>
+                  <button
+                    onClick={() => setIsAnalyzeOpen(false)}
+                    className="text-on-surface-variant hover:text-on-surface text-sm font-semibold"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                {isAnalyzing ? (
+                  <div className="flex items-center gap-2 text-sm text-on-surface-variant py-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span>Analyzing parts of speech...</span>
+                  </div>
+                ) : analyzeError ? (
+                  <div className="text-error text-sm">⚠️ {analyzeError}</div>
+                ) : (
+                  <>
+                    <POSLegend />
+                    <div className="bg-surface-container-lowest p-3.5 rounded-xl border border-outline/10 max-h-[180px] overflow-y-auto mt-2 select-text">
+                      <WordTokenHighlighter tokens={analyzeTokens} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )
       )}
@@ -605,7 +783,7 @@ export default function App() {
           <div className="px-6 pb-3 flex justify-center">
             <button onClick={() => window.snaplingo?.ocr.startScreenSelection()}
               className="bg-primary-container hover:bg-primary text-white font-semibold text-sm px-6 py-2.5 rounded-fluent shadow-rest flex items-center gap-2 transition">
-              📐 Screen Snip (OCR)
+              <IconScreenSnip className="w-4 h-4" /> Screen Snip (OCR)
             </button>
           </div>
         )}

@@ -110,6 +110,17 @@ export interface ImageOCRResult {
 }
 
 /**
+ * Typed payload for sending OCR text from popup to main window.
+ * Why: Structured object avoids raw string passing and enables future metadata.
+ */
+export interface OCRTextPayload {
+  text: string;
+  source: 'screen-snip';
+  mode: 'document' | 'code';
+  createdAt: string;
+}
+
+/**
  * Exposed API structure in Preload window.snaplingo.
  */
 export interface SnapLingoAPI {
@@ -146,6 +157,8 @@ export interface SnapLingoAPI {
     submitSelection: (rect: SelectionRect) => Promise<void>;
     importImage: () => Promise<ImageOCRResult | null>;
     recognizeImage: (filePath: string) => Promise<ImageOCRResult | null>;
+    sendTextToMain: (payload: OCRTextPayload) => Promise<void>;
+    onTextReceived: (callback: (payload: OCRTextPayload) => void) => () => void;
   };
   glossary: {
     getAll: () => Promise<Array<{ id: number; sourceTerm: string; targetTerm: string; createdAt: string }>>;
@@ -156,6 +169,9 @@ export interface SnapLingoAPI {
   cache: {
     clear: () => Promise<void>;
     getStats: () => Promise<{ count: number }>;
+  };
+  vocabulary: {
+    analyze: (text: string) => Promise<import('./vocabularyTypes').POSToken[]>;
   };
 }
 

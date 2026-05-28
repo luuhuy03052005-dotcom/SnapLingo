@@ -1,4 +1,5 @@
 import logoImg from './Logo.png';
+import { IconTranslate, IconScan, IconHistory, IconSettings, IconPrivacy } from './components/Icons';
 
 interface SidebarProps {
   activeTab: string;
@@ -7,12 +8,18 @@ interface SidebarProps {
   isCompact: boolean;
   privacyMode: boolean;
 }
+
+/**
+ * Sidebar navigation with professional SVG icons.
+ * Why: SVG icons render sharply at all DPI scales and match
+ * the official SnapLingo icon design language.
+ */
 export default function Sidebar({ activeTab, onTabChange, version, isCompact, privacyMode }: SidebarProps) {
   const tabs = [
-    { id: 'translator', icon: '文', label: 'Home' },
-    { id: 'image', icon: '🔍', label: 'Scan' },
-    { id: 'history', icon: '🕐', label: 'History' },
-    { id: 'settings', icon: '⚙️', label: 'Settings' },
+    { id: 'translator', icon: <IconTranslate className="w-[18px] h-[18px]" />, label: 'Home' },
+    { id: 'image', icon: <IconScan className="w-[18px] h-[18px]" />, label: 'Scan' },
+    { id: 'history', icon: <IconHistory className="w-[18px] h-[18px]" />, label: 'History' },
+    { id: 'settings', icon: <IconSettings className="w-[18px] h-[18px]" />, label: 'Settings' },
   ];
   return (
     <div className={`flex flex-col h-full bg-surface-container-low border-r border-outline-variant ${isCompact ? 'w-[48px]' : 'w-[200px]'}`}>
@@ -35,14 +42,14 @@ export default function Sidebar({ activeTab, onTabChange, version, isCompact, pr
               ${activeTab === t.id ? 'bg-primary-fixed text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-high'}`}
           >
             {activeTab === t.id && <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-primary-container rounded-r" />}
-            <span className="text-base">{t.icon}</span>
+            {t.icon}
             {!isCompact && <span className="text-[13px]">{t.label}</span>}
           </button>
         ))}
       </nav>
       <button onClick={() => onTabChange('settings')}
         className={`flex items-center gap-2 mx-1.5 mb-3 rounded-fluent px-3 py-2 text-on-surface-variant hover:bg-surface-container-high ${isCompact ? 'justify-center' : ''}`}>
-        <span className={`text-sm ${privacyMode ? 'text-teal' : ''}`}>🛡️</span>
+        <IconPrivacy className={`w-[16px] h-[16px] ${privacyMode ? 'text-teal' : ''}`} />
         {!isCompact && <span className="text-[12px] font-medium">Privacy</span>}
       </button>
     </div>

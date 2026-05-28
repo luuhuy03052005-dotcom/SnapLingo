@@ -48,3 +48,25 @@ export const translationCache = sqliteTable('translation_cache', {
   provider: text('provider').notNull(),
   createdAt: text('created_at').notNull()
 });
+
+/**
+ * SQLite table schema for vocabulary definitions (dictionary cache).
+ * Why: Saves word translations, parts of speech, phonetics, and examples locally.
+ */
+export const vocabularyDefinitions = sqliteTable('vocabulary_definitions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  word: text('word').notNull(),
+  normalizedWord: text('normalized_word').notNull(),
+  language: text('language').notNull(),
+  pos: text('pos'),
+  phonetic: text('phonetic'),
+  englishDefinition: text('english_definition'),
+  vietnameseDefinition: text('vietnamese_definition'),
+  examplesJson: text('examples_json'),
+  synonymsJson: text('synonyms_json'),
+  antonymsJson: text('antonyms_json'),
+  sourceProvider: text('source_provider'),
+  rawJson: text('raw_json'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
