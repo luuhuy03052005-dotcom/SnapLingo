@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconScreenSnip, IconAddToTranslator, IconTranslateNow, IconAnalyze, IconCopy, IconClear } from './Icons';
+import { IconScreenSnip, IconAddToTranslator, IconTranslateNow, IconAnalyze, IconCopy } from './Icons';
 
 interface OCRResultPanelProps {
   text: string;
@@ -13,10 +13,10 @@ interface OCRResultPanelProps {
 }
 
 /**
- * Persistent OCR Result Panel in Main App.
- * Why: OCR text must not live only inside the ephemeral floating popup.
- * This panel stores recognized text, allows editing, and provides
- * actions to push text into the translator or analyze POS.
+ * OCR Recognized Text Panel — Teal/secondary theme, right column.
+ * Why: The mockup shows this as a distinct panel with secondary (teal)
+ * accent to visually separate OCR results from the translation workspace.
+ * Editable textarea allows user to correct OCR errors before translating.
  */
 export const OCRResultPanel: React.FC<OCRResultPanelProps> = ({
   text,
@@ -39,59 +39,53 @@ export const OCRResultPanel: React.FC<OCRResultPanelProps> = ({
   };
 
   return (
-    <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4 space-y-3 transition-all duration-300">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <IconScreenSnip className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-          <span className="text-sm font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
-            Screen Snip Result
-          </span>
-        </div>
-        <button
-          onClick={onClear}
-          className="flex items-center gap-1 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 text-xs font-semibold transition"
-        >
-          <IconClear className="w-3.5 h-3.5" /> Clear
-        </button>
+    <div className="bg-surface-container-lowest rounded-xl border border-secondary/30 shadow-rest flex flex-col h-full">
+      {/* Header — teal tinted */}
+      <div className="px-4 py-2 border-b border-outline-variant/20 bg-secondary-container/10 flex justify-between items-center shrink-0 rounded-t-xl">
+        <h2 className="text-[14px] font-semibold text-on-surface flex items-center gap-1.5">
+          <IconScreenSnip className="w-[18px] h-[18px] text-secondary" />
+          Recognized Text
+        </h2>
+        <span className="text-[12px] text-secondary">Snipping Tool</span>
       </div>
 
-      {/* Editable textarea — user can correct OCR errors before translating */}
+      {/* Editable textarea */}
       <textarea
         value={text}
         onChange={(e) => onTextChange(e.target.value)}
-        className="w-full min-h-[80px] max-h-[150px] p-3 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/40 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-700 select-text leading-relaxed"
+        className="flex-1 w-full p-4 bg-transparent border-none resize-none focus:ring-0 text-[16px] text-on-surface leading-relaxed"
+        spellCheck={false}
         placeholder="OCR recognized text..."
       />
 
-      {/* Action buttons */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Action buttons footer */}
+      <div className="px-4 py-2 bg-surface/50 border-t border-outline-variant/20 flex flex-wrap gap-2 justify-end shrink-0">
         <button
-          onClick={onAddToTranslator}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-          title="Insert this text into the translator input (won't auto-translate)"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-variant transition-colors text-[12px] font-bold"
         >
-          <IconAddToTranslator className="w-3.5 h-3.5" /> Add to Translator
-        </button>
-        <button
-          onClick={onTranslateNow}
-          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition shadow-sm"
-          title="Insert and translate immediately"
-        >
-          <IconTranslateNow className="w-3.5 h-3.5" /> Translate Now
+          <IconCopy className="w-4 h-4" />
+          {copied ? 'Copied!' : 'Copy'}
         </button>
         <button
           onClick={onAnalyze}
-          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-500/20 dark:hover:bg-emerald-500/30 transition"
-          title="Analyze English Parts of Speech"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-variant transition-colors text-[12px] font-bold"
         >
-          <IconAnalyze className="w-3.5 h-3.5" /> Analyze
+          <IconAnalyze className="w-4 h-4" />
+          Analyze
         </button>
         <button
-          onClick={handleCopy}
-          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition"
+          onClick={onAddToTranslator}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-variant transition-colors text-[12px] font-bold"
         >
-          {copied ? <><span>✓</span> Copied</> : <><IconCopy className="w-3.5 h-3.5" /> Copy</>}
+          <IconAddToTranslator className="w-4 h-4" />
+          Add to Translator
+        </button>
+        <button
+          onClick={onTranslateNow}
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded bg-secondary text-white hover:bg-secondary/90 transition-colors text-[12px] font-bold"
+        >
+          Translate Now
         </button>
       </div>
     </div>

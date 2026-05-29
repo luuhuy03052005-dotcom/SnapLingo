@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 import { POSLegend } from './components/POSLegend';
 import { WordTokenHighlighter } from './components/WordTokenHighlighter';
 import { OCRResultPanel } from './components/OCRResultPanel';
-import { IconTranslate, IconScreenSnip, IconAnalyze, IconCopy, IconLocalProcessing } from './components/Icons';
+import { IconTranslate, IconScreenSnip, IconScan, IconHistory, IconSettings, IconPrivacy, IconAnalyze, IconCopy } from './components/Icons';
 import { POSToken } from '../../shared/vocabularyTypes';
 
 /**
@@ -30,6 +30,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('translator');
+  const [sidebarCompact, setSidebarCompact] = useState(false);
   const [sourceText, setSourceText] = useState('');
   const [translatedResult, setTranslatedResult] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
@@ -224,113 +225,174 @@ export default function App() {
     </div>
   );
 
-  // ─── TRANSLATOR TAB ───
+  // ─── TRANSLATOR TAB — 2-column grid matching Dashboard mockup ───
   const renderTranslatorPanel = () => (
-    <div className="flex flex-col h-full gap-4">
-      {/* OCR Snip Result Panel — persistent OCR text from Screen Snip */}
-      <OCRResultPanel
-        text={ocrSnipText}
-        isVisible={ocrSnipVisible}
-        onTextChange={setOcrSnipText}
-        onAddToTranslator={() => {
-          setSourceText(ocrSnipText);
-          setOcrSnipVisible(false);
-        }}
-        onTranslateNow={() => {
-          setSourceText(ocrSnipText);
-          setOcrSnipVisible(false);
-          setTimeout(() => handleTranslateRef.current(), 100);
-        }}
-        onAnalyze={() => handleAnalyzeVocabulary(ocrSnipText)}
-        onCopy={() => navigator.clipboard.writeText(ocrSnipText)}
-        onClear={() => { setOcrSnipText(''); setOcrSnipVisible(false); }}
-      />
+    <div className="flex flex-col h-full gap-6">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_minmax(300px,400px)] gap-6 h-full">
+        {/* LEFT COLUMN — Source + Translation panels stacked */}
+        <div className="flex flex-col gap-6 h-full">
+          {/* ─── Source Text Panel ─── */}
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 shadow-rest flex flex-col focus-within:border-primary focus-within:shadow-hover transition-all flex-1 min-h-[200px]">
+            {/* Header: language selector + char count */}
+            <div className="px-4 py-2 border-b border-outline-variant/20 bg-surface/50 flex justify-between items-center shrink-0">
+              <button className="flex items-center gap-1 text-primary text-[12px] font-bold hover:bg-surface-variant/50 px-2 py-1 rounded">
+                Detect Language (English) <span className="text-[16px]">▾</span>
+              </button>
+              <span className="text-[12px] text-outline">{sourceText.length} / 5000</span>
+            </div>
+            {/* Textarea — no internal border, transparent bg */}
+            <textarea
+              value={sourceText}
+              onChange={e => setSourceText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && e.ctrlKey && handleTranslate()}
+              placeholder="Enter text to translate..."
+              className="flex-1 w-full p-4 bg-transparent border-none resize-none focus:ring-0 text-[16px] text-on-surface placeholder:text-outline select-text"
+            />
+            {/* Footer: Translate button (pill shape) */}
+            <div className="px-4 py-2 border-t border-outline-variant/20 flex justify-end shrink-0">
+              <button
+                onClick={handleTranslate}
+                disabled={isTranslating}
+                className="px-8 py-2 rounded-full bg-primary text-white text-[12px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {isTranslating ? 'Translating...' : 'Translate'}
+              </button>
+            </div>
+          </div>
 
-      <div className="flex-1 grid grid-cols-2 gap-4">
-        <div className="flex flex-col">
-          <div className="flex items-center justify-between mb-2">
-            <select className="fluent-input px-2 py-1 text-sm text-primary font-medium" value="auto">
-              <option value="auto">Detect Language</option><option value="en">English</option><option value="vi">Vietnamese</option><option value="ja">Japanese</option>
-            </select>
-            <button onClick={() => { setSourceText(''); setTranslatedResult(''); setTranslateError(null); }} className="text-on-surface-variant hover:text-on-surface text-lg">✕</button>
-          </div>
-          <textarea value={sourceText} onChange={e => setSourceText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.ctrlKey && handleTranslate()}
-            placeholder="Type text, paste an image, or use Screen Snip..."
-            className="fluent-input flex-1 p-3 text-sm text-on-surface resize-none min-h-[200px] select-text" />
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-on-surface-variant">
-            <IconLocalProcessing className="w-3.5 h-3.5 text-teal" /><span>Local processing active</span>
-          </div>
-        </div>
-        <div className="flex flex-col">
-          <div className="flex items-center justify-between mb-2">
-            <select className="fluent-input px-2 py-1 text-sm text-primary font-medium"
-              value={settings[SETTINGS_KEYS.TARGET_LANGUAGE] || 'vi'} onChange={e => updateSetting(SETTINGS_KEYS.TARGET_LANGUAGE, e.target.value)}>
-              <option value="vi">Vietnamese</option><option value="en">English</option><option value="ja">Japanese</option>
-            </select>
-            <div className="flex gap-2.5 items-center">
-              {(translatedResult || sourceText) && (
+          {/* ─── Translation Result Panel ─── */}
+          <div className="bg-surface-container-low rounded-xl border border-outline-variant/20 shadow-rest flex flex-col flex-1 min-h-[200px]">
+            {/* Header: target language + action icons */}
+            <div className="px-4 py-2 border-b border-outline-variant/20 bg-surface/50 flex justify-between items-center shrink-0">
+              <select
+                className="text-primary text-[12px] font-bold bg-transparent border-none focus:ring-0 cursor-pointer"
+                value={settings[SETTINGS_KEYS.TARGET_LANGUAGE] || 'vi'}
+                onChange={e => updateSetting(SETTINGS_KEYS.TARGET_LANGUAGE, e.target.value)}
+              >
+                <option value="vi">Vietnamese</option>
+                <option value="en">English</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="zh">Chinese</option>
+                <option value="fr">French</option>
+              </select>
+              <div className="flex gap-1">
                 <button
-                  onClick={() => {
-                    const isEn = settings[SETTINGS_KEYS.TARGET_LANGUAGE] === 'en';
-                    handleAnalyzeVocabulary(isEn ? translatedResult : sourceText);
-                  }}
-                  className="text-xs font-bold px-2.5 py-1 bg-primary-container/20 dark:bg-primary-container/40 text-primary hover:bg-primary-container/30 dark:hover:bg-primary-container/50 rounded-lg transition"
-                  title="Analyze English Vocabulary (POS)"
+                  onClick={() => translatedResult && copyToClip(translatedResult, setCopiedText)}
+                  className="p-1 text-on-surface-variant hover:text-primary transition-colors rounded hover:bg-surface-variant/50 flex items-center justify-center"
+                  title="Copy"
                 >
-                  <IconAnalyze className="w-3.5 h-3.5 inline" /> Analyze
+                  {copiedText
+                    ? <span className="text-secondary text-[12px] font-bold">✓</span>
+                    : <IconCopy className="w-[18px] h-[18px]" />}
                 </button>
-              )}
-              <button onClick={() => translatedResult && copyToClip(translatedResult, setCopiedText)}
-                className="text-on-surface-variant hover:text-primary" title="Copy">{copiedText ? <span className="text-sm">✓</span> : <IconCopy className="w-4 h-4" />}</button>
-              <button className="text-on-surface-variant hover:text-primary text-base" title="Listen">🔊</button>
+                <button
+                  className="p-1 text-on-surface-variant hover:text-primary transition-colors rounded hover:bg-surface-variant/50 flex items-center justify-center"
+                  title="Pin to Corner"
+                >
+                  <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 2v10m0 0l4-4m-4 4l-4-4M5 14h14v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6z" /></svg>
+                </button>
+                {(translatedResult || sourceText) && (
+                  <button
+                    onClick={() => {
+                      const isEn = settings[SETTINGS_KEYS.TARGET_LANGUAGE] === 'en';
+                      handleAnalyzeVocabulary(isEn ? translatedResult : sourceText);
+                    }}
+                    className="p-1 text-on-surface-variant hover:text-primary transition-colors rounded hover:bg-surface-variant/50 flex items-center justify-center"
+                    title="Analyze POS"
+                  >
+                    <IconAnalyze className="w-[18px] h-[18px]" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="fluent-input flex-1 p-3 text-sm min-h-[200px] overflow-y-auto select-text bg-surface-container-lowest">
-            {isTranslating ? <div className="flex items-center justify-center h-full"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-container border-t-transparent" /></div>
-             : translateError ? <span className="text-error">⚠️ {translateError}</span>
-             : <span className="text-on-surface font-medium">{translatedResult || <span className="text-on-surface-variant italic">Translation will appear here</span>}</span>}
+            {/* Body: translation result */}
+            <div className="p-4 flex-1 overflow-y-auto select-text">
+              {isTranslating ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : translateError ? (
+                <span className="text-error text-[14px]">{translateError}</span>
+              ) : (
+                <p className="text-[16px] text-on-surface">
+                  {translatedResult || <span className="text-on-surface-variant italic">Translation will appear here.</span>}
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* POS Highlight Analysis Sub-Panel */}
-      {isAnalyzeOpen && (
-        <div className="mt-4 p-4 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all duration-300">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <IconAnalyze className="w-4 h-4" /> English Part-of-Speech Analysis
-            </h3>
-            <button
-              onClick={() => setIsAnalyzeOpen(false)}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-semibold"
-            >
-              ✕ Close
-            </button>
-          </div>
-          {isAnalyzing ? (
-            <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              <span>Analyzing parts of speech...</span>
+        {/* RIGHT COLUMN — OCR Recognized Text panel */}
+        <div className="flex flex-col h-full">
+          <OCRResultPanel
+            text={ocrSnipText}
+            isVisible={ocrSnipVisible}
+            onTextChange={setOcrSnipText}
+            onAddToTranslator={() => {
+              setSourceText(ocrSnipText);
+              setOcrSnipVisible(false);
+            }}
+            onTranslateNow={() => {
+              setSourceText(ocrSnipText);
+              setOcrSnipVisible(false);
+              setTimeout(() => handleTranslateRef.current(), 100);
+            }}
+            onAnalyze={() => handleAnalyzeVocabulary(ocrSnipText)}
+            onCopy={() => navigator.clipboard.writeText(ocrSnipText)}
+            onClear={() => { setOcrSnipText(''); setOcrSnipVisible(false); }}
+          />
+          {/* Empty state when no OCR text */}
+          {(!ocrSnipVisible || !ocrSnipText) && (
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 shadow-rest flex flex-col items-center justify-center h-full p-8 text-center">
+              <IconScreenSnip className="w-12 h-12 text-outline-variant/40 mb-4" />
+              <p className="text-[14px] font-semibold text-on-surface-variant">No Recognized Text</p>
+              <p className="text-[12px] text-outline mt-1">Use Screen Snip or import an image to recognize text</p>
             </div>
-          ) : analyzeError ? (
-            <div className="text-red-500 text-sm">⚠️ {analyzeError}</div>
-          ) : (
-            <>
-              <POSLegend />
-              <div className="bg-slate-50/80 dark:bg-slate-800/40 p-4 rounded-lg border border-slate-100 dark:border-slate-800 max-h-[300px] overflow-y-auto mt-2 select-text">
-                <WordTokenHighlighter tokens={analyzeTokens} />
-              </div>
-            </>
           )}
         </div>
-      )}
-
-      <div className="flex justify-center mt-4">
-        <button onClick={handleTranslate} disabled={isTranslating}
-          className="bg-primary-container hover:bg-primary text-white font-semibold text-sm px-8 py-2.5 rounded-fluent transition disabled:opacity-50 shadow-rest flex items-center gap-2">
-          {isTranslating ? 'Translating...' : <><IconTranslate className="w-4 h-4" /> Translate</>}
-        </button>
       </div>
+
+      {/* POS Analysis Panel — shown below the grid */}
+      {isAnalyzeOpen && (
+        <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-rest overflow-visible">
+          {/* Header + Legend */}
+          <div className="flex items-center justify-between">
+            <POSLegend />
+            <button
+              onClick={() => setIsAnalyzeOpen(false)}
+              className="text-on-surface-variant hover:text-on-surface text-[12px] font-bold px-4 py-2 transition"
+            >
+              ✕
+            </button>
+          </div>
+          {/* Content */}
+          <div className="p-6 relative">
+            {isAnalyzing ? (
+              <div className="flex items-center gap-2 text-[14px] text-on-surface-variant py-4">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span>Analyzing parts of speech...</span>
+              </div>
+            ) : analyzeError ? (
+              <div className="text-error text-[14px]">{analyzeError}</div>
+            ) : (
+              <WordTokenHighlighter tokens={analyzeTokens} />
+            )}
+          </div>
+          {/* Footer: Copy Analysis */}
+          <div className="px-4 py-2 bg-surface-container/30 border-t border-outline-variant/10 flex justify-end">
+            <button
+              onClick={() => {
+                const text = analyzeTokens.map(t => `${t.text} [${t.category}]`).join(' ');
+                navigator.clipboard.writeText(text);
+              }}
+              className="text-[12px] text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <IconCopy className="w-4 h-4" /> Copy Analysis
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -763,44 +825,76 @@ export default function App() {
       default: return renderTranslatorPanel();
     }
   };
-  const tabTitle: Record<string, string> = { translator: 'SnapLingo', image: 'Image OCR', history: 'Translation History', settings: 'Settings' };
+
+  // Quick action toolbar items
+  const toolbarItems = [
+    { id: 'text', icon: <IconTranslate className="w-5 h-5" />, label: 'Text', action: () => setActiveTab('translator') },
+    { id: 'snip', icon: <IconScreenSnip className="w-5 h-5" />, label: 'Screen Snip', action: () => window.snaplingo?.ocr.startScreenSelection() },
+    { id: 'import', icon: <IconScan className="w-5 h-5" />, label: 'Import', action: () => setActiveTab('image') },
+    { id: 'history', icon: <IconHistory className="w-5 h-5" />, label: 'History', action: () => setActiveTab('history') },
+  ];
 
   return (
-    <div className="flex h-screen bg-surface text-on-surface font-sans select-none overflow-hidden">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} version={version} isCompact={false} privacyMode={privacyMode} />
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between px-6 py-3 border-b border-outline-variant bg-surface-container-lowest">
-          <h1 className="text-lg font-semibold text-on-surface">{tabTitle[activeTab] || 'SnapLingo'}</h1>
-          <div className="flex items-center gap-3">
-            <button onClick={() => handleWindowModeToggle('compact')}
-              className="text-xs text-on-surface-variant hover:text-primary font-medium px-3 py-1 border border-outline-variant rounded-fluent transition">
-              Compact ↙
+    <div className="flex h-screen bg-surface-bright text-on-surface font-sans select-none overflow-hidden">
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} version={version} isCompact={sidebarCompact} privacyMode={privacyMode} onToggleCompact={() => setSidebarCompact(prev => !prev)} />
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* ─── Desktop Header with Badges ─── */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-outline-variant/20 bg-surface/80 backdrop-blur-md sticky top-0 z-40">
+          <div className="flex items-center gap-4">
+            <h1 className="text-[20px] font-semibold text-on-surface">Translate Workspace</h1>
+            <div className="flex gap-2">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary-container/30 text-on-secondary-container text-[12px] border border-secondary/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-secondary" /> Local Processing Active
+              </span>
+              {privacyMode && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary-container/30 text-primary text-[12px] border border-primary/20">
+                  <IconPrivacy className="w-[14px] h-[14px]" /> Privacy Mode On
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors flex items-center justify-center"
+            >
+              <IconSettings className="w-5 h-5" />
             </button>
           </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-6">{renderTabContent()}</main>
+        </div>
+
+        {/* ─── Quick Action Toolbar ─── */}
         {activeTab === 'translator' && (
-          <div className="px-6 pb-3 flex justify-center">
-            <button onClick={() => window.snaplingo?.ocr.startScreenSelection()}
-              className="bg-primary-container hover:bg-primary text-white font-semibold text-sm px-6 py-2.5 rounded-fluent shadow-rest flex items-center gap-2 transition">
-              <IconScreenSnip className="w-4 h-4" /> Screen Snip (OCR)
-            </button>
+          <div className="px-6 py-2 bg-surface-container-lowest border-b border-outline-variant/20 flex gap-2 shrink-0">
+            {toolbarItems.map(item => (
+              <button
+                key={item.id}
+                onClick={item.action}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors text-[14px]
+                  ${item.id === 'snip'
+                    ? 'bg-primary text-white shadow-fab hover:bg-primary/90'
+                    : 'bg-surface-variant/50 text-on-surface hover:text-primary'
+                  }`}
+              >
+                {item.icon} {item.label}
+              </button>
+            ))}
           </div>
         )}
-        <footer className="flex items-center justify-between px-6 py-1.5 border-t border-outline-variant bg-surface-container-low text-[11px]">
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${privacyMode ? 'bg-teal' : 'bg-primary-container'}`} />
-            <span className={`font-medium ${privacyMode ? 'text-teal' : 'text-primary'}`}>
-              {privacyMode ? 'Privacy Mode: Local Processing Only' : 'Standard Mode'}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-on-surface-variant">
-            <span>OCR Engine: Tesseract v2</span>
-            <span>•</span>
-            <span className="text-teal font-medium">Ready</span>
-          </div>
+
+        {/* ─── Main Content Area ─── */}
+        <div className="flex-1 p-6 overflow-y-auto">{renderTabContent()}</div>
+
+        {/* ─── Status Bar ─── */}
+        <footer className="h-8 bg-surface-container-high border-t border-outline-variant/20 px-4 flex items-center justify-between shrink-0">
+          <span className="text-[12px] text-on-surface-variant flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-secondary" /> Engine: Offline V3.1
+          </span>
+          <span className="text-[12px] text-on-surface-variant">
+            Memory Usage: {Math.round(performance?.memory?.usedJSHeapSize / 1048576 || 0)}MB
+          </span>
         </footer>
-      </div>
+      </main>
     </div>
   );
 }

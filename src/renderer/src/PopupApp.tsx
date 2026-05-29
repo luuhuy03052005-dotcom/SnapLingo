@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { TranslationResult, OCRTextPayload } from '../../shared/types';
-import logoImg from './Logo.png';
-import { IconAddToTranslator, IconTranslateNow, IconCopy } from './components/Icons';
+import { POSToken } from '../../shared/vocabularyTypes';
+import { IconTranslate, IconCopy, IconAnalyze } from './components/Icons';
+import { WordTokenHighlighter } from './components/WordTokenHighlighter';
+import { POSLegend } from './components/POSLegend';
 
 /**
  * Utility to strip Electron IPC error wrappers and standard "Error:" prefixes
@@ -32,6 +34,12 @@ export default function PopupApp() {
   const [copied, setCopied] = useState<boolean>(false);
   const [isPinned, setIsPinned] = useState<boolean>(true);
   const [privacyMode, setPrivacyMode] = useState<boolean>(false);
+
+  // POS Analysis state — inline learning note
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzeTokens, setAnalyzeTokens] = useState<POSToken[]>([]);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -145,42 +153,82 @@ export default function PopupApp() {
     }
   };
 
+  /**
+   * Run POS analysis on the original English text.
+   * Why: Users learning English want to see word categories right in the popup
+   * without opening the main app — like a pocket grammar note.
+   */
+  const handleAnalyze = async () => {
+    if (!originalText || !window.snaplingo) return;
+    const textToAnalyze = isCodeScan ? '' : originalText;
+    if (!textToAnalyze.trim()) return;
+
+    setShowAnalysis(true);
+    setIsAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeTokens([]);
+
+    try {
+      const tokens = await window.snaplingo.vocabulary.analyze(textToAnalyze);
+      setAnalyzeTokens(tokens);
+    } catch (e: unknown) {
+      setAnalyzeError(cleanIpcError(e));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // Code scan lines with line numbers for professional display
   const codeLines = codeText.split('\n');
 
   return (
-    <div className={`flex h-screen flex-col border rounded-xl shadow-2xl p-3 select-none overflow-hidden font-sans backdrop-blur-sm ${isCodeScan ? 'bg-gray-900/98 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200 text-gray-900'}`}>
-      {/* Title Bar - Draggable Region */}
-      <div 
+    <div className={`flex h-screen flex-col select-none overflow-hidden font-sans ${isCodeScan ? 'bg-gray-900 text-gray-100' : 'bg-surface rounded-xl shadow-float border border-outline-variant/30'}`}>
+      {/* ─── Header: Draggable ─── */}
+      <div
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        className={`flex items-center justify-between pb-1.5 mb-2 border-b cursor-move select-none ${isCodeScan ? 'border-gray-700' : 'border-gray-100'}`}
+        className={`flex items-center justify-between px-4 py-2 border-b cursor-move select-none shrink-0
+          ${isCodeScan ? 'bg-gray-900 border-gray-700' : 'bg-surface-container-low border-outline-variant/20'}`}
       >
-        <div className="flex items-center gap-1.5">
-          <img src={logoImg} alt="Logo" className="w-3.5 h-3.5 object-contain" />
-          <span className={`text-[10px] font-bold tracking-wider uppercase ${isCodeScan ? 'text-gray-500' : 'text-gray-400'}`}>SnapLingo</span>
-          {isCodeScan ? (
-            <span className="text-[10px] text-emerald-400 font-semibold ml-1">💻 Code Scan</span>
-          ) : detectedLang && !isLoading ? (
-            <span className="text-[10px] text-blue-500 font-semibold ml-1">{detectedLang} → {targetLang}</span>
-          ) : null}
+        <div className="flex items-center gap-2">
+          <IconTranslate className="w-[18px] h-[18px] text-primary" />
+          <span className="text-[12px] font-bold text-on-surface">SnapLingo</span>
         </div>
-        <div 
+        <div
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           className="flex items-center gap-1"
         >
-          {privacyMode && <span className="text-[9px] text-teal-500 font-medium">🛡️</span>}
           <button
             onClick={() => setIsPinned(!isPinned)}
             title={isPinned ? 'Pinned on top' : 'Click to Pin'}
-            className={`text-[10px] px-1.5 py-0.5 rounded transition ${isPinned ? 'text-blue-500 bg-blue-50' : isCodeScan ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
-          >📌</button>
-          <button onClick={() => window.close()} className={`text-xs px-1 rounded transition ${isCodeScan ? 'text-gray-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}>✕</button>
+            className={`p-[2px] rounded transition-colors
+              ${isPinned
+                ? 'text-primary hover:bg-surface-variant'
+                : isCodeScan ? 'text-gray-500 hover:text-gray-300' : 'text-on-surface-variant hover:text-primary hover:bg-surface-variant'
+              }`}
+          >
+            <svg className="w-4 h-4" fill={isPinned ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M16 4h2a2 2 0 012 2v2M8 4H6a2 2 0 00-2 2v2m0 4v6a2 2 0 002 2h12a2 2 0 002-2v-6M4 12h16" />
+            </svg>
+          </button>
+          <button
+            className={`p-[2px] rounded transition-colors ${isCodeScan ? 'text-gray-500 hover:text-gray-300' : 'text-on-surface-variant hover:bg-surface-variant'}`}
+            title="Collapse"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M20 12H4" /></svg>
+          </button>
+          <button
+            onClick={() => window.close()}
+            className={`p-[2px] rounded transition-colors ${isCodeScan ? 'text-gray-500 hover:text-red-400' : 'text-on-surface-variant hover:bg-error-container hover:text-error'}`}
+            title="Close"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" /></svg>
+          </button>
         </div>
       </div>
 
       {isCodeScan ? (
         /* ─── CODE SCAN DISPLAY ─── */
-        <div className="flex-1 overflow-auto rounded-lg bg-gray-950 border border-gray-800 font-mono text-[11px] leading-relaxed select-text">
+        <div className="flex-1 overflow-auto rounded-lg bg-gray-950 border border-gray-800 font-mono text-[11px] leading-relaxed select-text m-3">
           <table className="w-full border-collapse">
             <tbody>
               {codeLines.map((line, i) => (
@@ -194,57 +242,109 @@ export default function PopupApp() {
         </div>
       ) : (
         /* ─── DOCUMENT TRANSLATION DISPLAY ─── */
-        <>
-          {/* Source text preview */}
-          <div className="max-h-[50px] overflow-y-auto bg-gray-50 border border-gray-100 rounded-lg p-1.5 text-[11px] text-gray-500 italic break-words select-text mb-2">
-            {originalText || 'No text detected...'}
+        <div className="flex flex-col p-4 gap-2 bg-surface flex-1">
+          {/* Source text */}
+          <div className="bg-surface-container-lowest p-2 rounded border border-outline-variant/10">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-[12px] text-outline">English</span>
+            </div>
+            <p className="text-[14px] text-on-surface-variant line-clamp-2 select-text">
+              {originalText || 'No text detected...'}
+            </p>
           </div>
-
-          {/* Translation result */}
-          <div className="flex-1 overflow-y-auto bg-blue-50/50 border border-blue-100 rounded-lg p-2 flex flex-col justify-center">
+          {/* Translation result — teal accent */}
+          <div className="bg-secondary-container/10 p-2 rounded border border-secondary/20 flex-1">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-[12px] text-secondary">Vietnamese</span>
+            </div>
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center gap-1.5">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                <span className="text-[10px] text-gray-400">Translating...</span>
+              <div className="flex items-center gap-2 py-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-secondary border-t-transparent" />
+                <span className="text-[12px] text-on-surface-variant">Translating...</span>
               </div>
             ) : errorMsg ? (
-              <div className="text-red-500 text-[11px] text-center p-1 font-medium break-words">⚠️ {errorMsg}</div>
+              <p className="text-error text-[14px]">{errorMsg}</p>
             ) : (
-              <div className="text-gray-900 text-xs font-medium leading-relaxed break-words select-text h-full overflow-y-auto">
-                {translatedText || <span className="text-gray-400 italic">Translation empty...</span>}
-              </div>
+              <p className="text-[16px] text-on-surface font-semibold leading-relaxed select-text">
+                {translatedText || <span className="text-on-surface-variant italic font-normal">Translation empty...</span>}
+              </p>
             )}
           </div>
-        </>
+        </div>
       )}
 
-      {/* Footer */}
-      <div className={`flex items-center justify-between border-t pt-2 mt-2 ${isCodeScan ? 'border-gray-700' : 'border-gray-100'}`}>
-        <div className="flex items-center gap-2">
-          <span className={`text-[9px] ${isCodeScan ? 'text-gray-600' : 'text-gray-400'}`}>
-            <kbd className={`px-1 rounded border font-mono text-[8px] ${isCodeScan ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>ESC</kbd> close
-          </span>
-          {!isCodeScan && provider && <span className="text-[8px] text-gray-300">via {provider}</span>}
-          {isCodeScan && <span className="text-[8px] text-gray-600">{codeLines.length} lines</span>}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {copied && <span className="text-[10px] text-emerald-500 font-semibold animate-pulse">Copied!</span>}
-          {!isCodeScan && !isLoading && !errorMsg && originalText && (
-            <>
-              <button onClick={() => sendToMain(false)}
-                className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-[10px] px-2 py-0.5 rounded transition border border-gray-200 hover:border-blue-200"
-                title="Add OCR text to translator input without auto-translating"
-              ><IconAddToTranslator className="w-3 h-3" /> Add to Translator</button>
-              <button onClick={() => sendToMain(true)}
-                className="flex items-center gap-1 text-white bg-blue-500 hover:bg-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-lg transition"
-                title="Add OCR text to translator and translate immediately"
-              ><IconTranslateNow className="w-3 h-3" /> Translate Now</button>
-            </>
+      {/* ─── POS Analysis Panel — Learning Note ─── */}
+      {showAnalysis && !isCodeScan && (
+        <div className="border-t border-outline-variant/20 bg-surface-container-lowest">
+          {/* Mini header */}
+          <div className="flex items-center justify-between px-3 py-1.5 bg-surface-container-low/50">
+            <span className="text-[11px] font-bold text-on-surface-variant flex items-center gap-1">
+              <IconAnalyze className="w-3.5 h-3.5" /> Vocabulary Analysis
+            </span>
+            <button
+              onClick={() => setShowAnalysis(false)}
+              className="text-[11px] text-on-surface-variant hover:text-on-surface px-1"
+            >✕</button>
+          </div>
+          {/* Analysis content */}
+          <div className="px-3 py-2 max-h-[200px] overflow-y-auto">
+            {isAnalyzing ? (
+              <div className="flex items-center gap-2 py-2">
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span className="text-[11px] text-on-surface-variant">Analyzing...</span>
+              </div>
+            ) : analyzeError ? (
+              <p className="text-error text-[11px]">{analyzeError}</p>
+            ) : analyzeTokens.length > 0 ? (
+              <WordTokenHighlighter tokens={analyzeTokens} compact />
+            ) : null}
+          </div>
+          {/* Mini legend */}
+          {analyzeTokens.length > 0 && !isAnalyzing && (
+            <div className="px-3 pb-1.5 flex items-center gap-3 text-[10px] text-on-surface-variant">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pos-noun-bg border border-pos-noun-text/20" />Noun</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pos-verb-bg border border-pos-verb-text/20" />Verb</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pos-adj-bg border border-pos-adj-text/20" />Adj</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pos-adv-bg border border-pos-adv-text/20" />Adv</span>
+            </div>
           )}
-          <button disabled={isLoading || !!errorMsg || (!translatedText && !codeText)} onClick={handleCopy}
-            className={`flex items-center gap-1 disabled:opacity-30 text-white text-[10px] font-bold px-3 py-1 rounded-lg transition ${isCodeScan ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-          ><IconCopy className="w-3 h-3" /> {isCodeScan ? 'Copy Code' : 'Copy'}</button>
         </div>
+      )}
+
+      {/* ─── Footer Actions ─── */}
+      <div className={`flex items-center justify-between px-4 py-2 border-t shrink-0
+        ${isCodeScan ? 'bg-gray-900 border-gray-700' : 'bg-surface-container-lowest border-outline-variant/20'}`}>
+        <div className="flex items-center gap-2">
+          {copied && <span className="text-[10px] text-secondary font-bold animate-pulse">Copied!</span>}
+          <button
+            disabled={isLoading || !!errorMsg || (!translatedText && !codeText)}
+            onClick={handleCopy}
+            className="flex items-center gap-1 text-on-surface-variant hover:text-secondary transition-colors px-2 py-1 rounded hover:bg-surface-variant/50 disabled:opacity-30"
+          >
+            <IconCopy className="w-[18px] h-[18px]" />
+            <span className="text-[12px] font-bold">Copy</span>
+          </button>
+          {!isCodeScan && !isLoading && !errorMsg && originalText && (
+            <button
+              onClick={handleAnalyze}
+              className={`flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-surface-variant/50
+                ${showAnalysis ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+            >
+              <IconAnalyze className="w-[18px] h-[18px]" />
+              <span className="text-[12px] font-bold">Analyze</span>
+            </button>
+          )}
+        </div>
+        {/* Open in Main App button */}
+        <button
+          onClick={handleOpenFull}
+          className="flex items-center justify-center p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"
+          title="Open in Main App"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+          </svg>
+        </button>
       </div>
     </div>
   );

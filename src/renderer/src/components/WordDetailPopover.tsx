@@ -7,19 +7,20 @@ interface WordDetailPopoverProps {
   onClose: () => void;
 }
 
-// Category display labels with Vietnamese translation
-const CATEGORY_INFO: Record<string, { label: string; emoji: string; color: string }> = {
-  noun: { label: 'Noun · Danh từ', emoji: '📗', color: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800' },
-  verb: { label: 'Verb · Động từ', emoji: '📕', color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' },
-  adjective: { label: 'Adjective · Tính từ', emoji: '📘', color: 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800' },
-  adverb: { label: 'Adverb · Trạng từ', emoji: '📙', color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' },
-  other: { label: 'Other · Khác', emoji: '📄', color: 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700' }
+// POS badge styles — uppercase small colored tags
+const POS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
+  noun: { bg: 'bg-pos-noun-bg', text: 'text-pos-noun-text', label: 'NOUN' },
+  verb: { bg: 'bg-pos-verb-bg', text: 'text-pos-verb-text', label: 'VERB' },
+  adjective: { bg: 'bg-pos-adj-bg', text: 'text-pos-adj-text', label: 'ADJECTIVE' },
+  adverb: { bg: 'bg-pos-adv-bg', text: 'text-pos-adv-text', label: 'ADVERB' },
+  other: { bg: 'bg-pos-other-bg', text: 'text-pos-other-text', label: 'OTHER' }
 };
 
 /**
- * Smart click-to-open word detail popover with Vietnamese translation.
- * Why: Shows POS category, grammar tags, AND Vietnamese meaning by calling
- * the existing translation API for single-word lookup. Closes on ESC/click-outside.
+ * Word detail popover — positioned ABOVE the clicked word, white bg, with arrow.
+ * Why: The mockup shows the popover appearing above the word chip with a small
+ * downward-pointing arrow, white surface background, and clean shadow.
+ * Includes Vietnamese translation via the existing translation API.
  */
 export const WordDetailPopover: React.FC<WordDetailPopoverProps> = ({ token, anchorRect, onClose }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export const WordDetailPopover: React.FC<WordDetailPopoverProps> = ({ token, anc
     };
   }, [handleClickOutside, handleKeyDown]);
 
-  // Fetch Vietnamese meaning for the word via existing translation API
+  // Fetch Vietnamese meaning
   useEffect(() => {
     if (!token.text || token.category === 'punctuation' || token.category === 'whitespace') return;
     if (!window.snaplingo) return;
@@ -69,7 +70,6 @@ export const WordDetailPopover: React.FC<WordDetailPopoverProps> = ({ token, anc
           setViMeaning(result.translatedText);
         }
       } catch {
-        // Silently fail — translation is optional enhancement
         if (!cancelled) setViMeaning('');
       } finally {
         if (!cancelled) setIsTranslating(false);
@@ -79,73 +79,56 @@ export const WordDetailPopover: React.FC<WordDetailPopoverProps> = ({ token, anc
     return () => { cancelled = true; };
   }, [token.text, token.category]);
 
-  const info = CATEGORY_INFO[token.category] || CATEGORY_INFO.other;
+  const badge = POS_BADGE[token.category] || POS_BADGE.other;
 
-  // Position: prefer below anchor, flip above if near viewport bottom
-  const viewportHeight = window.innerHeight;
-  const spaceBelow = viewportHeight - anchorRect.bottom;
-  const showAbove = spaceBelow < 200;
-  const top = showAbove ? anchorRect.top - 8 : anchorRect.bottom + 6;
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 280));
+  // Position: ABOVE the anchor word, centered horizontally
+  const popoverWidth = 220;
+  const left = Math.max(8, Math.min(
+    anchorRect.left + anchorRect.width / 2 - popoverWidth / 2,
+    window.innerWidth - popoverWidth - 8
+  ));
+  const bottom = window.innerHeight - anchorRect.top + 8;
 
   return (
     <div
       ref={popoverRef}
-      className="fixed z-[9999] w-[260px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden"
+      className="fixed z-[9999] bg-surface-container-lowest border border-outline-variant rounded-xl shadow-fab overflow-visible"
       style={{
-        top: showAbove ? undefined : `${top}px`,
-        bottom: showAbove ? `${viewportHeight - top}px` : undefined,
+        width: `${popoverWidth}px`,
         left: `${left}px`,
-        animation: 'fadeInUp 0.15s ease-out'
+        bottom: `${bottom}px`,
+        animation: 'popoverFadeIn 0.2s ease-out'
       }}
     >
-      {/* Header: word text */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
-        <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
-          {token.text}
-        </span>
-        <button
-          onClick={onClose}
-          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-base font-bold leading-none p-1"
-        >
-          ✕
-        </button>
-      </div>
+      {/* Arrow pointing down */}
+      <div
+        className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-surface-container-lowest border-b border-r border-outline-variant rotate-45"
+      />
 
-      {/* Body */}
-      <div className="px-4 py-3 space-y-2.5">
-        {/* POS badge */}
-        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${info.color}`}>
-          <span>{info.emoji}</span>
-          <span>{info.label}</span>
+      {/* Content */}
+      <div className="relative z-10 p-4 flex flex-col gap-1">
+        {/* Word + POS badge */}
+        <div className="flex justify-between items-start">
+          <span className="text-[14px] font-bold text-on-surface">{token.text}</span>
+          <span className={`inline-flex items-center px-1 py-[2px] rounded-sm ${badge.bg} ${badge.text} text-[10px] font-bold uppercase tracking-wider`}>
+            {badge.label}
+          </span>
         </div>
 
-        {/* Tags */}
-        {token.posDetails && (
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-slate-600 dark:text-slate-300">Tags: </span>
-            {token.posDetails}
+        {/* Divider */}
+        <div className="h-px w-full bg-outline-variant/30 my-1" />
+
+        {/* Vietnamese meaning */}
+        {isTranslating ? (
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-[12px] text-on-surface-variant">Đang dịch...</span>
           </div>
+        ) : viMeaning ? (
+          <p className="text-[12px] text-on-surface-variant">{viMeaning}</p>
+        ) : (
+          <p className="text-[12px] text-on-surface-variant italic">Definition will appear here</p>
         )}
-
-        {/* Vietnamese meaning — fetched from translation API */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">🇻🇳 Nghĩa tiếng Việt</span>
-          </div>
-          {isTranslating ? (
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
-              <span className="text-xs text-slate-400">Đang dịch...</span>
-            </div>
-          ) : viMeaning ? (
-            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-              {viMeaning}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-400 italic">Không tìm thấy nghĩa</p>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -1,70 +1,44 @@
 import React from 'react';
+import { IconCopy } from './Icons';
 
 /**
- * Compact legend for POS underline colors.
- * Why: Tells user which underline color = which part of speech.
- * Uses clean inline text samples instead of heavy chips.
+ * POS Legend with colored dots — matches DESIGN.md POS Analysis panel header.
+ * Why: Compact colored dot indicators are less noisy than full chip blocks
+ * while still conveying the color-to-category mapping at a glance.
  */
 
 const LEGEND_ITEMS = [
-  { label: 'Noun', color: 'text-rose-600 dark:text-rose-400 decoration-rose-400' },
-  { label: 'Verb', color: 'text-emerald-600 dark:text-emerald-400 decoration-emerald-400' },
-  { label: 'Adjective', color: 'text-sky-600 dark:text-sky-400 decoration-sky-400' },
-  { label: 'Adverb', color: 'text-amber-600 dark:text-amber-400 decoration-amber-400' },
-  { label: 'Other', color: 'text-slate-500 dark:text-slate-400', plain: true }
+  { label: 'Noun', bg: 'bg-pos-noun-bg', border: 'border-pos-noun-text/20' },
+  { label: 'Verb', bg: 'bg-pos-verb-bg', border: 'border-pos-verb-text/20' },
+  { label: 'Adjective', bg: 'bg-pos-adj-bg', border: 'border-pos-adj-text/20' },
+  { label: 'Adverb', bg: 'bg-pos-adv-bg', border: 'border-pos-adv-text/20' },
 ];
 
-// Keep POS_COLORS export for backward compatibility with other components
+// Keep POS_COLORS export for backward compatibility
 export const POS_COLORS = {
-  noun: {
-    bg: 'bg-rose-50/80 dark:bg-rose-950/30',
-    border: 'border-rose-200 dark:border-rose-800/50',
-    text: 'text-rose-700 dark:text-rose-300',
-    label: 'Noun'
-  },
-  verb: {
-    bg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
-    border: 'border-emerald-200 dark:border-emerald-800/50',
-    text: 'text-emerald-700 dark:text-emerald-300',
-    label: 'Verb'
-  },
-  adjective: {
-    bg: 'bg-sky-50/80 dark:bg-sky-950/30',
-    border: 'border-sky-200 dark:border-sky-800/50',
-    text: 'text-sky-700 dark:text-sky-300',
-    label: 'Adjective'
-  },
-  adverb: {
-    bg: 'bg-amber-50/80 dark:bg-amber-950/30',
-    border: 'border-amber-200 dark:border-amber-800/50',
-    text: 'text-amber-700 dark:text-amber-300',
-    label: 'Adverb'
-  },
-  other: {
-    bg: 'bg-slate-100/80 dark:bg-slate-800/40',
-    border: 'border-slate-200 dark:border-slate-700/50',
-    text: 'text-slate-600 dark:text-slate-400',
-    label: 'Other'
-  }
+  noun: { bg: 'bg-pos-noun-bg', text: 'text-pos-noun-text', border: 'border-pos-noun-text/10', label: 'Noun' },
+  verb: { bg: 'bg-pos-verb-bg', text: 'text-pos-verb-text', border: 'border-pos-verb-text/10', label: 'Verb' },
+  adjective: { bg: 'bg-pos-adj-bg', text: 'text-pos-adj-text', border: 'border-pos-adj-text/10', label: 'Adjective' },
+  adverb: { bg: 'bg-pos-adv-bg', text: 'text-pos-adv-text', border: 'border-pos-adv-text/10', label: 'Adverb' },
+  other: { bg: 'bg-pos-other-bg', text: 'text-pos-other-text', border: 'border-pos-other-text/10', label: 'Other' }
 };
 
-export const POSLegend: React.FC = () => {
+interface POSLegendProps {
+  onCopyAnalysis?: () => void;
+}
+
+export const POSLegend: React.FC<POSLegendProps> = ({ onCopyAnalysis }) => {
   return (
-    <div className="flex flex-wrap gap-4 items-center px-3 py-2 mb-2 bg-white/80 dark:bg-slate-900/60 rounded-lg border border-slate-100 dark:border-slate-800 select-none">
-      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-        Legend:
-      </span>
-      {LEGEND_ITEMS.map((item) => (
-        <span
-          key={item.label}
-          className={`text-xs font-semibold ${item.color} ${item.plain ? '' : 'underline underline-offset-4 decoration-2'}`}
-        >
-          {item.label}
-        </span>
-      ))}
-      <span className="text-[10px] text-slate-400 ml-auto">
-        Click any word for details
-      </span>
+    <div className="px-4 py-2 bg-surface-container-low border-b border-outline-variant/20 flex items-center justify-between rounded-t-xl">
+      <h3 className="text-[14px] font-semibold text-on-surface">Part of Speech Analysis</h3>
+      <div className="flex items-center gap-3 flex-wrap">
+        {LEGEND_ITEMS.map((item) => (
+          <div key={item.label} className="flex items-center gap-1">
+            <span className={`w-3 h-3 rounded-full ${item.bg} border ${item.border}`} />
+            <span className="text-[12px] text-on-surface-variant">{item.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
